@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
@@ -476,7 +477,7 @@ type ScheduleModalProps = {
 };
 
 function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
-  const { cards, addScheduledPayment } = useFinance();
+  const { cards, setPendingPayment } = useFinance();
   const [selectedCards, setSelectedCards] = useState<Record<string, boolean>>({});
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [date, setDate] = useState("2026-04-15");
@@ -500,12 +501,13 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
       const val = parseFloat(amounts[id] || "0");
       amountMap[id] = isNaN(val) ? 0 : val;
     }
-    addScheduledPayment({ cardIds: selectedCardIds, date, amounts: amountMap, note });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setPendingPayment({ cardIds: selectedCardIds, date, amounts: amountMap, note });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onClose();
     setSelectedCards({});
     setAmounts({});
     setNote("");
+    router.push("/payment/bank-select");
   };
 
   return (

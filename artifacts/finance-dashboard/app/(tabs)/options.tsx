@@ -1,11 +1,14 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
+  Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
+import type { BankAccount } from "@/context/FinanceContext";
 
 type SettingRowProps = {
   icon: string;
@@ -80,11 +84,80 @@ function SectionLabel({ text }: { text: string }) {
   return <Text style={styles.sectionLabel}>{text}</Text>;
 }
 
+function AddBankModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { addBankAccount } = useFinance();
+  const insets = useSafeAreaInsets();
+  const [bankName, setBankName] = useState("");
+  const [accountType, setAccountType] = useState<"checking" | "savings">("checking");
+  const [lastFour, setLastFour] = useState("");
+  const [routing, setRouting] = useState("");
+  const [nickname, setNickname] = useState("");
+
+  const handleAdd = () => {
+    if (!bankName.trim() || lastFour.length < 4) {
+      Alert.alert("Required Fields", "Please enter the bank name and last 4 digits of your account.");
+      return;
+    }
+    addBankAccount({ bankName: bankName.trim(), accountType, lastFour: lastFour.slice(-4), nickname: nickname.trim() || undefined });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+    setBankName(""); setLastFour(""); setNickname(""); setRouting("");
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={bankModal.overlay}>
+        <View style={[bankModal.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={bankModal.handle} />
+          <View style={bankModal.header}>
+            <Text style={bankModal.title}>Link Bank Account</Text>
+            <Pressable onPress={onClose} style={bankModal.closeBtn}>
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={bankModal.achBadge}>
+              <Feather name="shield" size={13} color={Colors.positive} />
+              <Text style={bankModal.achText}>ACH Secure Transfer · 256-bit Encryption</Text>
+            </View>
+            <Text style={bankModal.fieldLabel}>Bank Name</Text>
+            <TextInput style={bankModal.input} value={bankName} onChangeText={setBankName} placeholder="e.g. Chase Bank" placeholderTextColor={Colors.textMuted} />
+            <Text style={bankModal.fieldLabel}>Account Type</Text>
+            <View style={bankModal.typeRow}>
+              {(["checking", "savings"] as const).map((t) => (
+                <Pressable key={t} onPress={() => setAccountType(t)} style={[bankModal.typeBtn, accountType === t && bankModal.typeBtnActive]}>
+                  <Text style={[bankModal.typeText, accountType === t && bankModal.typeTextActive]}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={bankModal.fieldLabel}>Last 4 Account Digits</Text>
+            <TextInput style={bankModal.input} value={lastFour} onChangeText={setLastFour} placeholder="1234" placeholderTextColor={Colors.textMuted} keyboardType="number-pad" maxLength={4} />
+            <Text style={bankModal.fieldLabel}>Routing Number</Text>
+            <TextInput style={bankModal.input} value={routing} onChangeText={setRouting} placeholder="123456789" placeholderTextColor={Colors.textMuted} keyboardType="number-pad" maxLength={9} />
+            <Text style={bankModal.fieldLabel}>Nickname (optional)</Text>
+            <TextInput style={bankModal.input} value={nickname} onChangeText={setNickname} placeholder="e.g. Primary Checking" placeholderTextColor={Colors.textMuted} />
+            <Text style={bankModal.disclaimer}>
+              By linking your account you authorize ACH debit transactions. Banking information is encrypted and never stored on our servers.
+            </Text>
+            <Pressable onPress={handleAdd} style={({ pressed }) => [bankModal.saveBtn, pressed && { opacity: 0.8 }]}>
+              <Feather name="link" size={16} color="#fff" />
+              <Text style={bankModal.saveBtnText}>Link Account</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function OptionsScreen() {
   const insets = useSafeAreaInsets();
-  const { totalBalance, cards, transactions } = useFinance();
+  const { totalBalance, cards, transactions, bankAccounts } = useFinance();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [biometricEnabled, setBiometricEnabled] = React.useState(false);
+  const [addBankVisible, setAddBankVisible] = useState(false);
 
   const totalCredit = transactions
     .filter((t) => t.type === "credit")
@@ -159,6 +232,47 @@ export default function OptionsScreen() {
           />
         </View>
 
+        <SectionLabel text="Linked Bank Accounts" />
+        <View style={styles.settingsGroup}>
+          {bankAccounts.map((bank, idx) => (
+            <React.Fragment key={bank.id}>
+              {idx > 0 && <View style={styles.rowDivider} />}
+              <View style={styles.settingRow}>
+                <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.1)" }]}>
+                  <Feather name="database" size={18} color={Colors.positive} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{bank.bankName}</Text>
+                  <Text style={styles.settingSubtitle}>
+                    {bank.accountType.charAt(0).toUpperCase() + bank.accountType.slice(1)} ···{bank.lastFour}
+                    {bank.nickname ? `  ·  ${bank.nickname}` : ""}
+                  </Text>
+                </View>
+                <View style={styles.achBadge}>
+                  <Text style={styles.achBadgeText}>ACH</Text>
+                </View>
+              </View>
+            </React.Fragment>
+          ))}
+          {bankAccounts.length > 0 && <View style={styles.rowDivider} />}
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              setAddBankVisible(true);
+            }}
+            style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
+          >
+            <View style={[styles.settingIcon, { backgroundColor: "rgba(108,158,255,0.1)" }]}>
+              <Feather name="plus-circle" size={18} color={Colors.primary} />
+            </View>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: Colors.primary }]}>Link New Bank Account</Text>
+              <Text style={styles.settingSubtitle}>ACH payments · secure transfer</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={Colors.textMuted} />
+          </Pressable>
+        </View>
+
         <SectionLabel text="Security" />
         <View style={styles.settingsGroup}>
           <SettingRow
@@ -223,6 +337,8 @@ export default function OptionsScreen() {
 
         <Text style={styles.version}>Finance App v1.0.0</Text>
       </ScrollView>
+
+      <AddBankModal visible={addBankVisible} onClose={() => setAddBankVisible(false)} />
     </LinearGradient>
   );
 }
@@ -399,5 +515,146 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: "center",
     paddingBottom: 8,
+  },
+  achBadge: {
+    backgroundColor: "rgba(74,222,170,0.12)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(74,222,170,0.25)",
+  },
+  achBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: Colors.positive,
+    letterSpacing: 1,
+  },
+});
+
+const bankModal = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#1C1048",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "90%",
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.divider,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.textPrimary,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  achBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(74,222,170,0.1)",
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(74,222,170,0.2)",
+    marginBottom: 20,
+  },
+  achText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.positive,
+  },
+  fieldLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  input: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 12,
+  },
+  typeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  typeBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  typeBtnActive: {
+    backgroundColor: Colors.primaryDark,
+    borderColor: Colors.primaryDark,
+  },
+  typeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  typeTextActive: { color: "#fff" },
+  disclaimer: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.primaryDark,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  saveBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
   },
 });
