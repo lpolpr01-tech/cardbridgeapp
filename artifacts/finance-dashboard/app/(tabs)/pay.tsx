@@ -32,6 +32,35 @@ const CARD_COLORS: Record<string, string> = {
   "card-3": "#3EC48A",
 };
 
+// ─── Crypto constants ────────────────────────────────────────────────────────
+
+type TokenKey = "btc" | "eth" | "sol";
+
+const CRYPTO_TOKENS: Record<TokenKey, {
+  symbol: string; name: string; logo: string;
+  address: string; balance: number; usdPrice: number;
+  color: string; network: string;
+}> = {
+  btc: {
+    symbol: "BTC", name: "Bitcoin", logo: "₿",
+    address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    balance: 0.2483, usdPrice: 62480,
+    color: "#F7931A", network: "Bitcoin Network",
+  },
+  eth: {
+    symbol: "ETH", name: "Ethereum", logo: "Ξ",
+    address: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    balance: 2.1547, usdPrice: 3245,
+    color: "#627EEA", network: "Ethereum Mainnet",
+  },
+  sol: {
+    symbol: "SOL", name: "Solana", logo: "◎",
+    address: "7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV",
+    balance: 42.85, usdPrice: 142,
+    color: "#9945FF", network: "Solana Mainnet",
+  },
+};
+
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -675,15 +704,514 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
   );
 }
 
+// ─── Crypto Logo ─────────────────────────────────────────────────────────────
+
+function CryptoLogo({ token, size = 40 }: { token: TokenKey; size?: number }) {
+  const t = CRYPTO_TOKENS[token];
+  return (
+    <View style={[cr.logoWrap, { width: size, height: size, borderRadius: size / 2, backgroundColor: `${t.color}22`, borderColor: `${t.color}55` }]}>
+      <Text style={[cr.logoText, { color: t.color, fontSize: size * 0.4 }]}>{t.logo}</Text>
+    </View>
+  );
+}
+
+// ─── Crypto Schedule Modal ────────────────────────────────────────────────────
+
+function CryptoScheduleModal({
+  visible,
+  onClose,
+  defaultToken,
+}: { visible: boolean; onClose: () => void; defaultToken?: TokenKey }) {
+  const { cards, addScheduledPayment } = useFinance();
+  const insets = useSafeAreaInsets();
+  const [activeToken, setActiveToken] = useState<TokenKey>(defaultToken ?? "btc");
+  const [cryptoAmt, setCryptoAmt] = useState("");
+  const [selectedCards, setSelectedCards] = useState<Record<string, boolean>>({});
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [date, setDate] = useState("2026-04-15");
+  const [note, setNote] = useState("");
+
+  const token = CRYPTO_TOKENS[activeToken];
+  const cryptoNum = parseFloat(cryptoAmt) || 0;
+  const usdEquiv = cryptoNum * token.usdPrice;
+  const selectedCardIds = cards.filter((c) => !!selectedCards[c.id]).map((c) => c.id);
+
+  const toggleCard = (id: string) => {
+    Haptics.selectionAsync();
+    setSelectedCards((p) => ({ ...p, [id]: !p[id] }));
+  };
+
+  const handleSchedule = () => {
+    if (selectedCardIds.length === 0) {
+      Alert.alert("Select Cards", "Choose at least one card to pay.");
+      return;
+    }
+    if (cryptoNum <= 0) {
+      Alert.alert("Enter Amount", "Enter the amount of crypto to convert.");
+      return;
+    }
+    const amtMap: Record<string, number> = {};
+    for (const id of selectedCardIds) {
+      const v = parseFloat(amounts[id] || "0");
+      amtMap[id] = isNaN(v) ? 0 : v;
+    }
+    const cryptoNote = `${token.logo} ${cryptoNum} ${token.symbol} → USD · ${token.network}${note ? ` · ${note}` : ""}`;
+    addScheduledPayment({ cardIds: selectedCardIds, date, amounts: amtMap, note: cryptoNote });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+    setSelectedCards({});
+    setAmounts({});
+    setCryptoAmt("");
+    setNote("");
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={csch.overlay}>
+        <View style={[csch.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={csch.handle} />
+          <View style={csch.header}>
+            <Text style={csch.title}>Schedule Crypto Payment</Text>
+            <Pressable onPress={onClose} style={csch.closeBtn}>
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Token selector */}
+            <Text style={csch.label}>Crypto Token</Text>
+            <View style={csch.tokenRow}>
+              {(["btc", "eth", "sol"] as TokenKey[]).map((tk) => {
+                const t = CRYPTO_TOKENS[tk];
+                return (
+                  <Pressable
+                    key={tk}
+                    onPress={() => { Haptics.selectionAsync(); setActiveToken(tk); }}
+                    style={[csch.tokenBtn, activeToken === tk && { borderColor: t.color, backgroundColor: `${t.color}18` }]}
+                  >
+                    <Text style={[csch.tokenLogo, { color: t.color }]}>{t.logo}</Text>
+                    <Text style={[csch.tokenSymbol, activeToken === tk && { color: t.color }]}>{t.symbol}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Crypto amount */}
+            <Text style={csch.label}>Amount to Convert</Text>
+            <View style={csch.amtRow}>
+              <View style={[csch.amtIcon, { backgroundColor: `${token.color}22` }]}>
+                <Text style={[csch.amtLogo, { color: token.color }]}>{token.logo}</Text>
+              </View>
+              <TextInput
+                style={csch.amtInput}
+                value={cryptoAmt}
+                onChangeText={setCryptoAmt}
+                keyboardType="decimal-pad"
+                placeholder={`0.00 ${token.symbol}`}
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+            {cryptoNum > 0 && (
+              <View style={csch.usdRow}>
+                <Feather name="arrow-right" size={12} color={Colors.textMuted} />
+                <Text style={csch.usdText}>≈ {formatCurrency(usdEquiv)} USD</Text>
+                <Text style={csch.usdRate}>@ ${token.usdPrice.toLocaleString()}/{token.symbol}</Text>
+              </View>
+            )}
+
+            {/* Available balance */}
+            <View style={csch.balanceRow}>
+              <Text style={csch.balanceLabel}>Available</Text>
+              <Text style={[csch.balanceVal, { color: token.color }]}>
+                {token.balance} {token.symbol} ({formatCurrency(token.balance * token.usdPrice)})
+              </Text>
+            </View>
+
+            {/* Cards */}
+            <Text style={csch.label}>Apply to Cards</Text>
+            {cards.map((card) => {
+              const selected = !!selectedCards[card.id];
+              const color = CARD_COLORS[card.id] || Colors.primary;
+              return (
+                <Pressable
+                  key={card.id}
+                  onPress={() => toggleCard(card.id)}
+                  style={[csch.cardRow, selected && { borderColor: color, backgroundColor: `${color}12` }]}
+                >
+                  <View style={[csch.dot, { backgroundColor: color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={csch.cardName}>{card.name}</Text>
+                    <Text style={csch.cardSub}>···{card.lastFour}</Text>
+                  </View>
+                  {selected && (
+                    <TextInput
+                      style={csch.cardAmt}
+                      value={amounts[card.id] || ""}
+                      onChangeText={(v) => setAmounts((p) => ({ ...p, [card.id]: v }))}
+                      keyboardType="decimal-pad"
+                      placeholder="$0.00"
+                      placeholderTextColor={Colors.textMuted}
+                      onPress={(e) => e.stopPropagation()}
+                    />
+                  )}
+                  <View style={[csch.checkbox, selected && { backgroundColor: color, borderColor: color }]}>
+                    {selected && <Feather name="check" size={11} color="#fff" />}
+                  </View>
+                </Pressable>
+              );
+            })}
+
+            {/* Date */}
+            <Text style={csch.label}>Payment Date</Text>
+            <View style={csch.dateRow}>
+              <Feather name="calendar" size={16} color={Colors.primary} />
+              <TextInput
+                style={csch.dateInput}
+                value={date}
+                onChangeText={setDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+
+            {/* Note */}
+            <Text style={csch.label}>Note (optional)</Text>
+            <TextInput
+              style={csch.noteInput}
+              value={note}
+              onChangeText={setNote}
+              placeholder="e.g. Pay card minimum..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+            />
+
+            {/* Info banner */}
+            <View style={csch.infoBanner}>
+              <Feather name="info" size={14} color={token.color} />
+              <Text style={csch.infoText}>
+                {token.name} will be swapped to USD at market rate on the payment date. Standard ACH processing applies after conversion.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={handleSchedule}
+              style={({ pressed }) => [csch.schedBtn, { backgroundColor: token.color }, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={csch.schedLogo}>{token.logo}</Text>
+              <Text style={csch.schedBtnText}>Schedule Crypto Payment</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Crypto Main Modal ────────────────────────────────────────────────────────
+
+function CryptoModal({
+  visible,
+  onClose,
+  defaultPayAll,
+}: { visible: boolean; onClose: () => void; defaultPayAll?: boolean }) {
+  const { cards } = useFinance();
+  const insets = useSafeAreaInsets();
+  const [activeToken, setActiveToken] = useState<TokenKey>("btc");
+  const [sendVisible, setSendVisible] = useState(false);
+  const [sendAddr, setSendAddr] = useState("");
+  const [sendAmt, setSendAmt] = useState("");
+  const [scheduleVisible, setScheduleVisible] = useState(false);
+  const [view, setView] = useState<"main" | "send" | "receive">("main");
+
+  const token = CRYPTO_TOKENS[activeToken];
+  const usdValue = token.balance * token.usdPrice;
+
+  const allTokens: TokenKey[] = ["btc", "eth", "sol"];
+
+  const handleCopyAddress = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Copied", "Wallet address copied to clipboard.");
+  };
+
+  const handleSend = () => {
+    if (!sendAddr || !sendAmt) {
+      Alert.alert("Missing Info", "Enter a destination address and amount.");
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      "Transaction Submitted",
+      `Sending ${sendAmt} ${token.symbol} to ${sendAddr.slice(0, 8)}...${sendAddr.slice(-6)}`,
+      [{ text: "OK", onPress: () => { setView("main"); setSendAddr(""); setSendAmt(""); } }]
+    );
+  };
+
+  return (
+    <>
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+        <View style={cry.overlay}>
+          <View style={[cry.sheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={cry.handle} />
+
+            {/* Header */}
+            <View style={cry.header}>
+              {view !== "main" ? (
+                <Pressable onPress={() => setView("main")} style={cry.backBtn}>
+                  <Feather name="chevron-left" size={20} color={Colors.textPrimary} />
+                  <Text style={cry.backText}>Crypto Wallet</Text>
+                </Pressable>
+              ) : (
+                <Text style={cry.title}>Crypto Wallet</Text>
+              )}
+              <Pressable onPress={onClose} style={cry.closeBtn}>
+                <Feather name="x" size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Token tabs */}
+            <View style={cry.tokenTabs}>
+              {allTokens.map((tk) => {
+                const t = CRYPTO_TOKENS[tk];
+                return (
+                  <Pressable
+                    key={tk}
+                    onPress={() => { Haptics.selectionAsync(); setActiveToken(tk); setView("main"); }}
+                    style={[cry.tokenTab, activeToken === tk && { backgroundColor: `${t.color}22`, borderColor: `${t.color}55` }]}
+                  >
+                    <Text style={[cry.tokenTabLogo, { color: t.color }]}>{t.logo}</Text>
+                    <Text style={[cry.tokenTabText, activeToken === tk && { color: t.color }]}>{t.symbol}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {view === "main" && (
+                <>
+                  {/* Balance card */}
+                  <LinearGradient
+                    colors={[`${token.color}33`, `${token.color}11`]}
+                    style={cry.balanceCard}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={cry.balanceTop}>
+                      <View>
+                        <Text style={cry.balanceNetwork}>{token.network}</Text>
+                        <Text style={cry.balanceSymbol}>{token.name}</Text>
+                      </View>
+                      <View style={[cry.logoCircle, { backgroundColor: `${token.color}33`, borderColor: `${token.color}66` }]}>
+                        <Text style={[cry.logoGlyph, { color: token.color }]}>{token.logo}</Text>
+                      </View>
+                    </View>
+                    <View>
+                      <Text style={[cry.balanceMain, { color: token.color }]}>
+                        {token.balance} {token.symbol}
+                      </Text>
+                      <Text style={cry.balanceUSD}>{formatCurrency(usdValue)} USD</Text>
+                    </View>
+                    <View style={cry.ratePill}>
+                      <Feather name="trending-up" size={11} color={token.color} />
+                      <Text style={[cry.rateText, { color: token.color }]}>
+                        ${token.usdPrice.toLocaleString()}/{token.symbol}
+                      </Text>
+                    </View>
+                  </LinearGradient>
+
+                  {/* Address section */}
+                  <View style={cry.addressSection}>
+                    <Text style={cry.addressLabel}>{token.network} Address</Text>
+                    <View style={cry.addressRow}>
+                      <Text style={cry.addressText} numberOfLines={1} ellipsizeMode="middle">
+                        {token.address}
+                      </Text>
+                      <Pressable onPress={handleCopyAddress} style={cry.copyBtn}>
+                        <Feather name="copy" size={14} color={Colors.primary} />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  {/* All token summary */}
+                  <Text style={cry.allTokensLabel}>All Wallets</Text>
+                  <View style={cry.allTokensList}>
+                    {allTokens.map((tk) => {
+                      const t = CRYPTO_TOKENS[tk];
+                      return (
+                        <Pressable
+                          key={tk}
+                          onPress={() => { setActiveToken(tk); Haptics.selectionAsync(); }}
+                          style={[cry.tokenRow, activeToken === tk && { borderColor: `${t.color}44`, backgroundColor: `${t.color}0A` }]}
+                        >
+                          <View style={[cry.tokenRowIcon, { backgroundColor: `${t.color}22` }]}>
+                            <Text style={[cry.tokenRowLogo, { color: t.color }]}>{t.logo}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={cry.tokenRowName}>{t.name}</Text>
+                            <Text style={cry.tokenRowAddr} numberOfLines={1} ellipsizeMode="middle">
+                              {t.address}
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: "flex-end" }}>
+                            <Text style={[cry.tokenRowBal, { color: t.color }]}>{t.balance} {t.symbol}</Text>
+                            <Text style={cry.tokenRowUSD}>{formatCurrency(t.balance * t.usdPrice)}</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Action buttons */}
+                  <View style={cry.actionRow}>
+                    <Pressable
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setView("send"); }}
+                      style={[cry.actionBtn, { borderColor: `${token.color}44` }]}
+                    >
+                      <Feather name="arrow-up-right" size={18} color={token.color} />
+                      <Text style={[cry.actionBtnText, { color: token.color }]}>Send</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setView("receive"); }}
+                      style={[cry.actionBtn, { borderColor: `${token.color}44` }]}
+                    >
+                      <Feather name="arrow-down-left" size={18} color={token.color} />
+                      <Text style={[cry.actionBtnText, { color: token.color }]}>Receive</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
+                      style={[cry.actionBtn, { borderColor: Colors.positive + "66", backgroundColor: "rgba(74,222,170,0.08)" }]}
+                    >
+                      <Feather name="credit-card" size={18} color={Colors.positive} />
+                      <Text style={[cry.actionBtnText, { color: Colors.positive }]}>Pay Card</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Schedule payment button */}
+                  <Pressable
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
+                    style={({ pressed }) => [cry.schedBtn, pressed && { opacity: 0.8 }]}
+                  >
+                    <LinearGradient
+                      colors={[token.color, `${token.color}AA`]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={cry.schedBtnGrad}
+                    >
+                      <Feather name="zap" size={16} color="#fff" />
+                      <Text style={cry.schedBtnText}>Schedule Crypto Payment</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </>
+              )}
+
+              {view === "send" && (
+                <>
+                  <View style={cry.balanceCard}>
+                    <View style={cry.balanceTop}>
+                      <View>
+                        <Text style={cry.balanceNetwork}>Sending from</Text>
+                        <Text style={cry.balanceSymbol}>{token.name} Wallet</Text>
+                      </View>
+                      <View style={[cry.logoCircle, { backgroundColor: `${token.color}33`, borderColor: `${token.color}66` }]}>
+                        <Text style={[cry.logoGlyph, { color: token.color }]}>{token.logo}</Text>
+                      </View>
+                    </View>
+                    <Text style={cry.sendBalLabel}>Available: <Text style={{ color: token.color }}>{token.balance} {token.symbol} ({formatCurrency(usdValue)})</Text></Text>
+                  </View>
+
+                  <Text style={cry.sendLabel}>Destination Address</Text>
+                  <TextInput
+                    style={cry.sendInput}
+                    value={sendAddr}
+                    onChangeText={setSendAddr}
+                    placeholder={`${token.symbol} wallet address or exchange...`}
+                    placeholderTextColor={Colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={cry.sendLabel}>Amount</Text>
+                  <View style={cry.sendAmtRow}>
+                    <TextInput
+                      style={[cry.sendInput, { flex: 1 }]}
+                      value={sendAmt}
+                      onChangeText={setSendAmt}
+                      placeholder={`0.00 ${token.symbol}`}
+                      placeholderTextColor={Colors.textMuted}
+                      keyboardType="decimal-pad"
+                    />
+                    {parseFloat(sendAmt) > 0 && (
+                      <Text style={cry.sendUsd}>≈ {formatCurrency(parseFloat(sendAmt) * token.usdPrice)}</Text>
+                    )}
+                  </View>
+
+                  <View style={cry.sendWarning}>
+                    <Feather name="alert-triangle" size={14} color="#F59E0B" />
+                    <Text style={cry.sendWarningText}>
+                      Crypto transactions are irreversible. Double-check the address before sending.
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    onPress={handleSend}
+                    style={({ pressed }) => [cry.sendBtn, { backgroundColor: token.color }, pressed && { opacity: 0.8 }]}
+                  >
+                    <Feather name="arrow-up-right" size={16} color="#fff" />
+                    <Text style={cry.sendBtnText}>Send {token.symbol}</Text>
+                  </Pressable>
+                </>
+              )}
+
+              {view === "receive" && (
+                <>
+                  <View style={[cry.balanceCard, { alignItems: "center" }]}>
+                    <View style={[cry.qrPlaceholder, { borderColor: `${token.color}44` }]}>
+                      <Text style={[cry.logoGlyph, { color: token.color, fontSize: 48 }]}>{token.logo}</Text>
+                      <Text style={cry.qrLabel}>QR Code</Text>
+                    </View>
+                    <Text style={cry.receiveNetwork}>{token.network}</Text>
+                  </View>
+
+                  <Text style={cry.sendLabel}>{token.symbol} Address</Text>
+                  <View style={cry.receiveAddrBox}>
+                    <Text style={cry.receiveAddr}>{token.address}</Text>
+                  </View>
+                  <Pressable onPress={handleCopyAddress} style={cry.copyAddrBtn}>
+                    <Feather name="copy" size={15} color={Colors.primary} />
+                    <Text style={cry.copyAddrText}>Copy Address</Text>
+                  </Pressable>
+
+                  <View style={cry.sendWarning}>
+                    <Feather name="info" size={14} color={Colors.primary} />
+                    <Text style={cry.sendWarningText}>
+                      Only send {token.symbol} on the {token.network}. Sending other assets may result in permanent loss.
+                    </Text>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <CryptoScheduleModal
+        visible={scheduleVisible}
+        onClose={() => setScheduleVisible(false)}
+        defaultToken={activeToken}
+      />
+    </>
+  );
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function PayScreen() {
   const { transactions, cards, scheduledPayments, totalBalance } = useFinance();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>("All");
-  const [scheduleVisible, setScheduleVisible] = useState(false);
-  const [calendarVisible, setCalendarVisible] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<ScheduledPayment | null>(null);
+  const [scheduleVisible, setScheduleVisible]   = useState(false);
+  const [calendarVisible, setCalendarVisible]   = useState(false);
+  const [cryptoVisible, setCryptoVisible]       = useState(false);
+  const [selectedPayment, setSelectedPayment]   = useState<ScheduledPayment | null>(null);
 
   const filtered = transactions
     .filter((t) => {
@@ -694,24 +1222,190 @@ export default function PayScreen() {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const cardById = Object.fromEntries(cards.map((c) => [c.id, c]));
-  const totalDebit = transactions
-    .filter((t) => t.type === "debit")
-    .reduce((s, t) => s + Math.abs(t.amount), 0);
-  const totalCredit = transactions
-    .filter((t) => t.type === "credit")
-    .reduce((s, t) => s + t.amount, 0);
+  const totalDebit   = transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalCredit  = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
+
+  const handlePayAll = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      "Pay All Cards",
+      `Pay all ${cards.length} cards totaling ${formatCurrency(totalBalance)} on the next billing date?`,
+      [{ text: "Cancel", style: "cancel" }, { text: "Confirm", style: "default", onPress: () => {} }]
+    );
+  };
 
   return (
-    <LinearGradient
-      colors={[Colors.backgroundGradientStart, Colors.backgroundGradientEnd]}
-      style={styles.gradient}
-    >
+    <LinearGradient colors={[Colors.backgroundGradientStart, Colors.backgroundGradientEnd]} style={styles.gradient}>
+
+      {/* ── Fixed header section ── */}
+      <View style={[styles.fixedTop, { paddingTop: insets.top + 12 }]}>
+
+        {/* Title row */}
+        <View style={styles.pageHeader}>
+          <View>
+            <Text style={styles.pageTitle}>Pay</Text>
+            <Text style={styles.pageSubtitle}>Manage & schedule payments</Text>
+          </View>
+          <View style={styles.headerBtns}>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); setCalendarVisible(true); }}
+              style={({ pressed }) => [styles.calBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Feather name="calendar" size={19} color={Colors.primary} />
+            </Pressable>
+            <Pressable
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
+              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.75 }]}
+            >
+              <Feather name="plus" size={26} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Summary */}
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Money In</Text>
+            <Text style={[styles.summaryAmt, { color: Colors.positive }]}>+{formatCurrency(totalCredit)}</Text>
+          </View>
+          <View style={styles.summaryDiv} />
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Money Out</Text>
+            <Text style={[styles.summaryAmt, { color: Colors.negative }]}>-{formatCurrency(totalDebit)}</Text>
+          </View>
+        </View>
+
+        {/* Scheduled payments */}
+        {scheduledPayments.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Scheduled Payments</Text>
+            {scheduledPayments.map((sp) => {
+              const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
+              return (
+                <View key={sp.id} style={styles.scheduledCard}>
+                  <View style={styles.scheduledTop}>
+                    <Pressable
+                      onPress={() => { Haptics.selectionAsync(); setSelectedPayment(sp); }}
+                      style={({ pressed }) => [styles.datePill, pressed && { opacity: 0.75 }]}
+                    >
+                      <Feather name="calendar" size={13} color={Colors.primary} />
+                      <Text style={styles.datePillText}>{formatDateDisplay(sp.date)}</Text>
+                      <View style={styles.datePillChevron}>
+                        <Feather name="chevron-right" size={11} color={Colors.primary} />
+                      </View>
+                    </Pressable>
+                    <View style={[styles.statusBadge, { backgroundColor: sp.status === "pending" ? "rgba(108,158,255,0.15)" : "rgba(74,222,170,0.15)" }]}>
+                      <Text style={[styles.statusText, { color: sp.status === "pending" ? Colors.primary : Colors.positive }]}>
+                        {sp.status === "pending" ? "Pending" : "Completed"}
+                      </Text>
+                    </View>
+                  </View>
+                  {sp.note ? <Text style={styles.scheduledNote}>{sp.note}</Text> : null}
+                  <View style={styles.scheduledCards}>
+                    {sp.cardIds.map((cid) => {
+                      const c = cardById[cid];
+                      if (!c) return null;
+                      return (
+                        <View key={cid} style={styles.scheduledCardRow}>
+                          <View style={[styles.cardDot, { backgroundColor: CARD_COLORS[cid] || Colors.primary }]} />
+                          <Text style={styles.scheduledCardName}>{c.name} ···{c.lastFour}</Text>
+                          <Text style={styles.scheduledAmt}>{formatCurrency(sp.amounts[cid] || 0)}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <View style={styles.scheduledTotalRow}>
+                    <Text style={styles.scheduledTotalLabel}>Total</Text>
+                    <Text style={styles.scheduledTotalValue}>{formatCurrency(totalAmt)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {/* ── Action icon buttons: Pay | Crypto ── */}
+        <View style={styles.actionIconsRow}>
+          {/* Pay button */}
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
+            style={({ pressed }) => [styles.actionIconCard, pressed && { opacity: 0.85 }]}
+          >
+            <LinearGradient
+              colors={[Colors.primaryDark, "#6C9EFF"]}
+              start={{ x: 0, y: 1 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.actionIconGrad}
+            >
+              <View style={styles.actionIconInner}>
+                <Feather name="credit-card" size={26} color="#fff" />
+                <Text style={styles.actionIconLabel}>Pay</Text>
+                <Pressable
+                  onPress={(e) => { e.stopPropagation(); handlePayAll(); }}
+                  style={styles.payAllPill}
+                >
+                  <Feather name="zap" size={11} color={Colors.primaryDark} />
+                  <Text style={styles.payAllPillText}>Pay All</Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+          </Pressable>
+
+          {/* Crypto button */}
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setCryptoVisible(true); }}
+            style={({ pressed }) => [styles.actionIconCard, pressed && { opacity: 0.85 }]}
+          >
+            <LinearGradient
+              colors={["#1a1033", "#2d1060"]}
+              start={{ x: 0, y: 1 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.actionIconGrad}
+            >
+              <View style={styles.actionIconInner}>
+                <View style={styles.cryptoIconStack}>
+                  {(["btc", "eth", "sol"] as TokenKey[]).map((tk, i) => (
+                    <Text key={tk} style={[styles.cryptoStackLogo, { color: CRYPTO_TOKENS[tk].color, marginLeft: i > 0 ? -6 : 0 }]}>
+                      {CRYPTO_TOKENS[tk].logo}
+                    </Text>
+                  ))}
+                </View>
+                <Text style={styles.actionIconLabel}>Crypto</Text>
+                <Pressable
+                  onPress={(e) => { e.stopPropagation(); setCryptoVisible(true); }}
+                  style={[styles.payAllPill, { backgroundColor: "rgba(153,69,255,0.15)", borderColor: "rgba(153,69,255,0.4)" }]}
+                >
+                  <Text style={[styles.payAllPillText, { color: "#9945FF" }]}>Pay All</Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+          </Pressable>
+        </View>
+
+        {/* Transaction filter row */}
+        <View style={styles.filterRow}>
+          <Text style={styles.sectionTitle}>Transaction History</Text>
+          <View style={styles.filters}>
+            {FILTERS.map((f) => (
+              <Pressable
+                key={f}
+                onPress={() => setFilter(f)}
+                style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+              >
+                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {/* ── Scrollable transaction list ── */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 120 }]}
+        style={styles.txList}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
           <TransactionItem transaction={item} card={cardById[item.cardId]} showCard />
@@ -722,173 +1416,7 @@ export default function PayScreen() {
             <Text style={styles.emptyText}>No transactions found</Text>
           </View>
         )}
-        ListHeaderComponent={() => (
-          <>
-            {/* ── Header ── */}
-            <View style={[styles.pageHeader, { paddingTop: insets.top + 16 }]}>
-              <View>
-                <Text style={styles.pageTitle}>Pay</Text>
-                <Text style={styles.pageSubtitle}>Manage & schedule payments</Text>
-              </View>
-              <View style={styles.headerBtns}>
-                {/* Calendar overview button */}
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setCalendarVisible(true);
-                  }}
-                  style={({ pressed }) => [styles.calBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <Feather name="calendar" size={19} color={Colors.primary} />
-                </Pressable>
-                {/* Add payment button */}
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setScheduleVisible(true);
-                  }}
-                  style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.75 }]}
-                >
-                  <Feather name="plus" size={26} color="#fff" />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* ── Summary ── */}
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>Money In</Text>
-                <Text style={[styles.summaryAmt, { color: Colors.positive }]}>
-                  +{formatCurrency(totalCredit)}
-                </Text>
-              </View>
-              <View style={styles.summaryDiv} />
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>Money Out</Text>
-                <Text style={[styles.summaryAmt, { color: Colors.negative }]}>
-                  -{formatCurrency(totalDebit)}
-                </Text>
-              </View>
-            </View>
-
-            {/* ── Scheduled payments ── */}
-            {scheduledPayments.length > 0 && (
-              <>
-                <Text style={styles.sectionTitle}>Scheduled Payments</Text>
-                {scheduledPayments.map((sp) => {
-                  const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
-                  return (
-                    <View key={sp.id} style={styles.scheduledCard}>
-                      <View style={styles.scheduledTop}>
-                        {/* Highlighted tappable date */}
-                        <Pressable
-                          onPress={() => {
-                            Haptics.selectionAsync();
-                            setSelectedPayment(sp);
-                          }}
-                          style={({ pressed }) => [
-                            styles.datePill,
-                            pressed && { opacity: 0.75 },
-                          ]}
-                        >
-                          <Feather name="calendar" size={13} color={Colors.primary} />
-                          <Text style={styles.datePillText}>{formatDateDisplay(sp.date)}</Text>
-                          <View style={styles.datePillChevron}>
-                            <Feather name="chevron-right" size={11} color={Colors.primary} />
-                          </View>
-                        </Pressable>
-                        <View style={[
-                          styles.statusBadge,
-                          { backgroundColor: sp.status === "pending" ? "rgba(108,158,255,0.15)" : "rgba(74,222,170,0.15)" },
-                        ]}>
-                          <Text style={[
-                            styles.statusText,
-                            { color: sp.status === "pending" ? Colors.primary : Colors.positive },
-                          ]}>
-                            {sp.status === "pending" ? "Pending" : "Completed"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {sp.note ? <Text style={styles.scheduledNote}>{sp.note}</Text> : null}
-
-                      <View style={styles.scheduledCards}>
-                        {sp.cardIds.map((cid) => {
-                          const c = cardById[cid];
-                          if (!c) return null;
-                          return (
-                            <View key={cid} style={styles.scheduledCardRow}>
-                              <View style={[styles.cardDot, { backgroundColor: CARD_COLORS[cid] || Colors.primary }]} />
-                              <Text style={styles.scheduledCardName}>
-                                {c.name} ···{c.lastFour}
-                              </Text>
-                              <Text style={styles.scheduledAmt}>
-                                {formatCurrency(sp.amounts[cid] || 0)}
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-
-                      <View style={styles.scheduledTotalRow}>
-                        <Text style={styles.scheduledTotalLabel}>Total</Text>
-                        <Text style={styles.scheduledTotalValue}>{formatCurrency(totalAmt)}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </>
-            )}
-
-            {/* ── Transaction history header ── */}
-            <View style={styles.filterRow}>
-              <Text style={styles.sectionTitle}>Transaction History</Text>
-              <View style={styles.filters}>
-                {FILTERS.map((f) => (
-                  <Pressable
-                    key={f}
-                    onPress={() => setFilter(f)}
-                    style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-                  >
-                    <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-                      {f}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          </>
-        )}
       />
-
-      {/* ── Pay All Button ── */}
-      <View style={[styles.payAllContainer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable
-          onPress={() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert(
-              "Pay All Cards",
-              `This will pay all ${cards.length} cards totaling ${formatCurrency(totalBalance)} on the next billing date. Proceed?`,
-              [
-                { text: "Cancel", style: "cancel" },
-                { text: "Confirm", style: "default", onPress: () => {} },
-              ]
-            );
-          }}
-          style={({ pressed }) => [styles.payAllBtn, pressed && { opacity: 0.85 }]}
-        >
-          <LinearGradient
-            colors={[Colors.primaryDark, "#6C9EFF"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.payAllGrad}
-          >
-            <Feather name="zap" size={18} color="#fff" />
-            <Text style={styles.payAllText}>Pay All Cards</Text>
-            <Text style={styles.payAllAmt}>{formatCurrency(totalBalance)}</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
 
       <ScheduleModal visible={scheduleVisible} onClose={() => setScheduleVisible(false)} />
       <CalendarOverviewModal
@@ -899,6 +1427,10 @@ export default function PayScreen() {
       <PaymentDetailModal
         payment={selectedPayment}
         onClose={() => setSelectedPayment(null)}
+      />
+      <CryptoModal
+        visible={cryptoVisible}
+        onClose={() => setCryptoVisible(false)}
       />
     </LinearGradient>
   );
@@ -1159,6 +1691,76 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: "rgba(255,255,255,0.8)",
+  },
+
+  // New layout styles
+  fixedTop: {
+    paddingBottom: 4,
+  },
+  txList: {
+    flex: 1,
+  },
+  actionIconsRow: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 16,
+    gap: 12,
+  },
+  actionIconCard: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  actionIconGrad: {
+    padding: 2,
+    borderRadius: 20,
+  },
+  actionIconInner: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: 6,
+  },
+  actionIconLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
+  payAllPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  payAllPillText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.primaryDark,
+  },
+  cryptoIconStack: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 28,
+  },
+  cryptoStackLogo: {
+    fontSize: 22,
+    lineHeight: 28,
   },
 });
 
@@ -1819,5 +2421,660 @@ const sch = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 15,
     color: "#fff",
+  },
+});
+
+// ─── CryptoLogo styles ────────────────────────────────────────────────────────
+
+const cr = StyleSheet.create({
+  logoWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+  },
+  logoText: {
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+});
+
+// ─── CryptoScheduleModal styles ───────────────────────────────────────────────
+
+const csch = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#12093A",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "92%",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.textPrimary,
+  },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 14,
+  },
+  tokenRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 4,
+  },
+  tokenBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    gap: 4,
+  },
+  tokenLogo: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
+  tokenSymbol: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  amtRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    overflow: "hidden",
+  },
+  amtIcon: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  amtLogo: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+  },
+  amtInput: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 16,
+    color: Colors.textPrimary,
+    paddingVertical: 14,
+    paddingRight: 14,
+  },
+  usdRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  usdText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.positive,
+  },
+  usdRate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  balanceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  balanceLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  balanceVal: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  cardName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  cardSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  cardAmt: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 80,
+    textAlign: "right",
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 4,
+  },
+  dateInput: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  noteInput: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 4,
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
+  infoBanner: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  infoText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  schedBtn: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  schedLogo: {
+    fontSize: 16,
+    color: "#fff",
+  },
+  schedBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
+  },
+});
+
+// ─── CryptoModal styles ───────────────────────────────────────────────────────
+
+const cry = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#0E0828",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "94%",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.textPrimary,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  backText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tokenTabs: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 20,
+  },
+  tokenTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  tokenTabLogo: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  tokenTabText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  balanceCard: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    gap: 12,
+  },
+  balanceTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  balanceNetwork: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginBottom: 2,
+  },
+  balanceSymbol: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.textPrimary,
+  },
+  logoCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+  },
+  logoGlyph: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+  },
+  balanceMain: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 28,
+    letterSpacing: -0.5,
+  },
+  balanceUSD: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  ratePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  rateText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  addressSection: {
+    marginBottom: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    gap: 8,
+  },
+  addressLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  addressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  addressText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  copyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(108,158,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  allTokensLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  allTokensList: { gap: 8, marginBottom: 20 },
+  tokenRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
+  },
+  tokenRowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tokenRowLogo: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  tokenRowName: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  tokenRowAddr: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+  tokenRowBal: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  tokenRowUSD: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  actionBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  schedBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  schedBtnGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 8,
+  },
+  schedBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
+  },
+  sendLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 14,
+  },
+  sendInput: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  sendAmtRow: {
+    gap: 8,
+  },
+  sendUsd: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.positive,
+    paddingHorizontal: 4,
+  },
+  sendBalLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  sendWarning: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+    backgroundColor: "rgba(245,158,11,0.08)",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.3)",
+  },
+  sendWarningText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  sendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  sendBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
+  },
+  qrPlaceholder: {
+    width: 160,
+    height: 160,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    marginBottom: 12,
+    gap: 8,
+  },
+  qrLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  receiveNetwork: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  receiveAddrBox: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 10,
+  },
+  receiveAddr: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+    letterSpacing: 0.5,
+  },
+  copyAddrBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(108,158,255,0.14)",
+    borderRadius: 12,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: "rgba(108,158,255,0.3)",
+    marginBottom: 8,
+  },
+  copyAddrText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.primary,
   },
 });
