@@ -16,9 +16,9 @@ function NativeTabLayout() {
         <Icon sf={{ default: "creditcard", selected: "creditcard.fill" }} />
         <Label>Card List</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="transactions">
-        <Icon sf={{ default: "list.bullet.rectangle", selected: "list.bullet.rectangle.fill" }} />
-        <Label>Transactions</Label>
+      <NativeTabs.Trigger name="pay">
+        <Icon sf={{ default: "banknote", selected: "banknote.fill" }} />
+        <Label>Pay</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="options">
         <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
@@ -78,14 +78,14 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="transactions"
+        name="pay"
         options={{
-          title: "Transactions",
+          title: "Pay",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="list.bullet.rectangle" tintColor={color} size={22} />
+              <SymbolView name="banknote" tintColor={color} size={22} />
             ) : (
-              <Feather name="list" size={21} color={color} />
+              <Feather name="send" size={21} color={color} />
             ),
         }}
       />

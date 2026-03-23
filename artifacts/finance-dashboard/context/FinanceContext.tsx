@@ -7,6 +7,15 @@ import React, {
   useState,
 } from "react";
 
+export type CardRewards = {
+  type: "cashback" | "points" | "both";
+  cashbackRate?: number;
+  cashbackTotal?: number;
+  pointsRate?: number;
+  pointsTotal?: number;
+  description: string;
+};
+
 export type Card = {
   id: string;
   name: string;
@@ -15,6 +24,16 @@ export type Card = {
   color: [string, string];
   type: "visa" | "mastercard" | "amex";
   limit: number;
+  rewards: CardRewards;
+};
+
+export type ScheduledPayment = {
+  id: string;
+  cardIds: string[];
+  date: string;
+  amounts: Record<string, number>;
+  note: string;
+  status: "pending" | "completed";
 };
 
 export type Transaction = {
@@ -31,7 +50,9 @@ export type Transaction = {
 type FinanceContextType = {
   cards: Card[];
   transactions: Transaction[];
+  scheduledPayments: ScheduledPayment[];
   totalBalance: number;
+  addScheduledPayment: (payment: Omit<ScheduledPayment, "id" | "status">) => void;
 };
 
 const FinanceContext = createContext<FinanceContextType | null>(null);
@@ -45,6 +66,14 @@ const INITIAL_CARDS: Card[] = [
     color: ["#6C3DB8", "#9B5CF5"],
     type: "visa",
     limit: 15000,
+    rewards: {
+      type: "both",
+      cashbackRate: 1.5,
+      cashbackTotal: 218.40,
+      pointsRate: 3,
+      pointsTotal: 42850,
+      description: "3x points on dining & travel, 1.5% cash back on everything else",
+    },
   },
   {
     id: "card-2",
@@ -54,6 +83,12 @@ const INITIAL_CARDS: Card[] = [
     color: ["#1E5FAD", "#3E8EDD"],
     type: "mastercard",
     limit: 10000,
+    rewards: {
+      type: "points",
+      pointsRate: 5,
+      pointsTotal: 87320,
+      description: "5x points on flights & hotels, 2x on restaurants",
+    },
   },
   {
     id: "card-3",
@@ -63,6 +98,12 @@ const INITIAL_CARDS: Card[] = [
     color: ["#2A7A5B", "#3EC48A"],
     type: "amex",
     limit: 8000,
+    rewards: {
+      type: "cashback",
+      cashbackRate: 2,
+      cashbackTotal: 94.60,
+      description: "2% unlimited cash back on all purchases",
+    },
   },
 ];
 
@@ -189,14 +230,40 @@ const INITIAL_TRANSACTIONS: Transaction[] = [
   },
 ];
 
+const INITIAL_SCHEDULED: ScheduledPayment[] = [
+  {
+    id: "sp-1",
+    cardIds: ["card-1", "card-2"],
+    date: "2026-04-01",
+    amounts: { "card-1": 500, "card-2": 250 },
+    note: "Monthly auto-pay",
+    status: "pending",
+  },
+];
+
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [cards] = useState<Card[]>(INITIAL_CARDS);
   const [transactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [scheduledPayments, setScheduledPayments] = useState<ScheduledPayment[]>(INITIAL_SCHEDULED);
 
   const totalBalance = cards.reduce((sum, c) => sum + c.balance, 0);
 
+  const addScheduledPayment = useCallback(
+    (payment: Omit<ScheduledPayment, "id" | "status">) => {
+      const newPayment: ScheduledPayment = {
+        ...payment,
+        id: `sp-${Date.now()}`,
+        status: "pending",
+      };
+      setScheduledPayments((prev) => [...prev, newPayment]);
+    },
+    []
+  );
+
   return (
-    <FinanceContext.Provider value={{ cards, transactions, totalBalance }}>
+    <FinanceContext.Provider
+      value={{ cards, transactions, scheduledPayments, totalBalance, addScheduledPayment }}
+    >
       {children}
     </FinanceContext.Provider>
   );
