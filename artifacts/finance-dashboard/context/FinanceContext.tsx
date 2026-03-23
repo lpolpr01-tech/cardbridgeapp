@@ -70,6 +70,7 @@ type FinanceContextType = {
   pendingPayment: PendingPayment | null;
   totalBalance: number;
   addScheduledPayment: (payment: Omit<ScheduledPayment, "id" | "status">) => void;
+  cancelScheduledPayment: (id: string) => void;
   addBankAccount: (bank: Omit<BankAccount, "id">) => void;
   setPendingPayment: (p: PendingPayment | null) => void;
 };
@@ -190,6 +191,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const cancelScheduledPayment = useCallback((id: string) => {
+    setScheduledPayments((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   const addBankAccount = useCallback(
     (bank: Omit<BankAccount, "id">) => {
       const newBank: BankAccount = { ...bank, id: `bank-${Date.now()}` };
@@ -208,6 +213,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         pendingPayment,
         totalBalance,
         addScheduledPayment,
+        cancelScheduledPayment,
         addBankAccount,
         setPendingPayment,
       }}

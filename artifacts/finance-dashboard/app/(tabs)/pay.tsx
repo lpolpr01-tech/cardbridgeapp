@@ -187,13 +187,48 @@ type PaymentDetailModalProps = {
 };
 
 function PaymentDetailModal({ payment, onClose }: PaymentDetailModalProps) {
-  const { cards } = useFinance();
+  const { cards, cancelScheduledPayment } = useFinance();
   const insets = useSafeAreaInsets();
   const cardById = Object.fromEntries(cards.map((c) => [c.id, c]));
 
   if (!payment) return null;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const payDate = parseDate(payment.date);
+  const businessDaysAway = (() => {
+    let d = new Date(today);
+    let count = 0;
+    while (d < payDate) {
+      d.setDate(d.getDate() + 1);
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) count++;
+    }
+    return count;
+  })();
+  const isPast = payDate < today;
+  const isProcessing = !isPast && businessDaysAway <= 2;
+  const canCancel = !isPast && !isProcessing;
+
+  const handleCancel = () => {
+    Alert.alert(
+      "Cancel Payment",
+      "Are you sure you want to cancel this scheduled payment? This action cannot be undone.",
+      [
+        { text: "Keep Payment", style: "cancel" },
+        {
+          text: "Cancel Payment",
+          style: "destructive",
+          onPress: () => {
+            cancelScheduledPayment(payment.id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            onClose();
+          },
+        },
+      ]
+    );
+  };
+
   const procEndDate = addBusinessDays(payDate, 2);
   const receivedDate = addBusinessDays(payDate, 4);
   const totalAmt = Object.values(payment.amounts).reduce((s, a) => s + a, 0);
@@ -299,6 +334,36 @@ function PaymentDetailModal({ payment, onClose }: PaymentDetailModalProps) {
                 </View>
               );
             })}
+
+            {/* ── Cancel / Status section ── */}
+            <View style={pDetail.cancelSection}>
+              {isPast ? (
+                <View style={pDetail.statusRow}>
+                  <Feather name="check-circle" size={15} color={Colors.positive} />
+                  <Text style={[pDetail.statusText, { color: Colors.positive }]}>
+                    Payment completed
+                  </Text>
+                </View>
+              ) : isProcessing ? (
+                <View style={pDetail.processingBanner}>
+                  <Feather name="loader" size={14} color="#F59E0B" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={pDetail.processingTitle}>Payment In Processing</Text>
+                    <Text style={pDetail.processingSubtitle}>
+                      Within 2 business days — cancellation is no longer available
+                    </Text>
+                  </View>
+                </View>
+              ) : canCancel ? (
+                <Pressable
+                  onPress={handleCancel}
+                  style={({ pressed }) => [pDetail.cancelBtn, pressed && { opacity: 0.8 }]}
+                >
+                  <Feather name="x-circle" size={16} color={Colors.negative} />
+                  <Text style={pDetail.cancelBtnText}>Cancel Payment</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -1377,6 +1442,59 @@ const pDetail = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: Colors.textPrimary,
+  },
+  cancelSection: {
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  cancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,107,138,0.1)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,107,138,0.3)",
+    paddingVertical: 14,
+  },
+  cancelBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.negative,
+  },
+  processingBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(245,158,11,0.1)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.25)",
+    padding: 14,
+  },
+  processingTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#F59E0B",
+    marginBottom: 2,
+  },
+  processingSubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
+    paddingVertical: 10,
+  },
+  statusText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
   },
 });
 
