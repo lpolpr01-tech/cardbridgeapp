@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -59,6 +60,18 @@ const CRYPTO_TOKENS: Record<TokenKey, {
     balance: 42.85, usdPrice: 142,
     color: "#9945FF", network: "Solana Mainnet",
   },
+};
+
+const GAS_FEES: Record<TokenKey, { usd: number; level: "low" | "moderate" | "high" }> = {
+  btc: { usd: 8.50,  level: "moderate" },
+  eth: { usd: 32.40, level: "high"     },
+  sol: { usd: 0.002, level: "low"      },
+};
+
+const GAS_COLOR: Record<string, string> = {
+  low: Colors.positive,
+  moderate: "#F59E0B",
+  high: Colors.negative,
 };
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -576,6 +589,7 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [date, setDate] = useState("2026-04-15");
   const [note, setNote] = useState("");
+  const [autoPay, setAutoPay] = useState(false);
   const insets = useSafeAreaInsets();
 
   const toggleCard = (id: string) => {
@@ -595,12 +609,14 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
       const val = parseFloat(amounts[id] || "0");
       amountMap[id] = isNaN(val) ? 0 : val;
     }
-    setPendingPayment({ cardIds: selectedCardIds, date, amounts: amountMap, note });
+    const fullNote = [autoPay ? "Auto-pay: Monthly" : "", note].filter(Boolean).join(" · ");
+    setPendingPayment({ cardIds: selectedCardIds, date, amounts: amountMap, note: fullNote });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onClose();
     setSelectedCards({});
     setAmounts({});
     setNote("");
+    setAutoPay(false);
     router.push("/payment/bank-select");
   };
 
@@ -690,12 +706,34 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
               multiline
             />
 
+            {/* ── Auto-pay toggle (bank account only) ── */}
+            <View style={sch.autoPayRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={sch.autoPayTitle}>Auto-pay (Bank Account)</Text>
+                <Text style={sch.autoPaySub}>Repeat monthly on the same date via ACH</Text>
+              </View>
+              <Switch
+                value={autoPay}
+                onValueChange={(v) => { Haptics.selectionAsync(); setAutoPay(v); }}
+                trackColor={{ false: Colors.divider, true: Colors.primaryDark }}
+                thumbColor={autoPay ? "#fff" : "#aaa"}
+              />
+            </View>
+            {autoPay && (
+              <View style={sch.autoPayBanner}>
+                <Feather name="refresh-cw" size={13} color={Colors.primary} />
+                <Text style={sch.autoPayBannerText}>
+                  Payment will automatically repeat every month on the selected date. Cancel anytime from the scheduled payments list.
+                </Text>
+              </View>
+            )}
+
             <Pressable
               onPress={handleSave}
               style={({ pressed }) => [sch.saveBtn, pressed && { opacity: 0.8 }]}
             >
               <Feather name="check-circle" size={16} color="#fff" />
-              <Text style={sch.saveBtnText}>Schedule Payment</Text>
+              <Text style={sch.saveBtnText}>{autoPay ? "Enable Auto-pay" : "Schedule Payment"}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -724,45 +762,107 @@ function CryptoScheduleModal({
 }: { visible: boolean; onClose: () => void; defaultToken?: TokenKey }) {
   const { cards, addScheduledPayment } = useFinance();
   const insets = useSafeAreaInsets();
-  const [activeToken, setActiveToken] = useState<TokenKey>(defaultToken ?? "btc");
-  const [cryptoAmt, setCryptoAmt] = useState("");
+
+  // multi-token state: each token can be selected independently
+  const [selectedTokens, setSelectedTokens] = useState<Record<TokenKey, boolean>>({
+    btc: defaultToken === "btc" || defaultToken == null,
+    eth: defaultToken === "eth",
+    sol: defaultToken === "sol",
+  });
+  const [cryptoAmts, setCryptoAmts] = useState<Record<TokenKey, string>>({ btc: "", eth: "", sol: "" });
   const [selectedCards, setSelectedCards] = useState<Record<string, boolean>>({});
-  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [cardAmounts, setCardAmounts] = useState<Record<string, string>>({});
   const [date, setDate] = useState("2026-04-15");
   const [note, setNote] = useState("");
 
-  const token = CRYPTO_TOKENS[activeToken];
-  const cryptoNum = parseFloat(cryptoAmt) || 0;
-  const usdEquiv = cryptoNum * token.usdPrice;
-  const selectedCardIds = cards.filter((c) => !!selectedCards[c.id]).map((c) => c.id);
+  const activeTokenKeys = (["btc", "eth", "sol"] as TokenKey[]).filter((tk) => selectedTokens[tk]);
+  const selectedCardIds  = cards.filter((c) => !!selectedCards[c.id]).map((c) => c.id);
 
+  const totalUsd = activeTokenKeys.reduce((sum, tk) => {
+    const n = parseFloat(cryptoAmts[tk] || "0") || 0;
+    return sum + n * CRYPTO_TOKENS[tk].usdPrice;
+  }, 0);
+
+  const totalGas = activeTokenKeys.reduce((sum, tk) => sum + GAS_FEES[tk].usd, 0);
+  const highGasTokens = activeTokenKeys.filter((tk) => GAS_FEES[tk].level === "high");
+
+  const toggleToken = (tk: TokenKey) => {
+    Haptics.selectionAsync();
+    setSelectedTokens((p) => ({ ...p, [tk]: !p[tk] }));
+  };
   const toggleCard = (id: string) => {
     Haptics.selectionAsync();
     setSelectedCards((p) => ({ ...p, [id]: !p[id] }));
   };
 
+  const doSchedule = () => {
+    const amtMap: Record<string, number> = {};
+    for (const id of selectedCardIds) {
+      const v = parseFloat(cardAmounts[id] || "0");
+      amtMap[id] = isNaN(v) ? 0 : v;
+    }
+    const tokenSummary = activeTokenKeys
+      .map((tk) => `${CRYPTO_TOKENS[tk].logo} ${cryptoAmts[tk] || "0"} ${CRYPTO_TOKENS[tk].symbol}`)
+      .join(" + ");
+    const cryptoNote = `${tokenSummary} → USD${note ? ` · ${note}` : ""}`;
+    addScheduledPayment({ cardIds: selectedCardIds, date, amounts: amtMap, note: cryptoNote });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+    setSelectedTokens({ btc: true, eth: false, sol: false });
+    setCryptoAmts({ btc: "", eth: "", sol: "" });
+    setSelectedCards({});
+    setCardAmounts({});
+    setNote("");
+  };
+
   const handleSchedule = () => {
+    if (activeTokenKeys.length === 0) {
+      Alert.alert("Select Tokens", "Choose at least one crypto token.");
+      return;
+    }
     if (selectedCardIds.length === 0) {
       Alert.alert("Select Cards", "Choose at least one card to pay.");
       return;
     }
-    if (cryptoNum <= 0) {
-      Alert.alert("Enter Amount", "Enter the amount of crypto to convert.");
+    const hasAmount = activeTokenKeys.some((tk) => parseFloat(cryptoAmts[tk] || "0") > 0);
+    if (!hasAmount) {
+      Alert.alert("Enter Amount", "Enter a crypto amount for at least one selected token.");
       return;
     }
-    const amtMap: Record<string, number> = {};
-    for (const id of selectedCardIds) {
-      const v = parseFloat(amounts[id] || "0");
-      amtMap[id] = isNaN(v) ? 0 : v;
+
+    if (highGasTokens.length > 0) {
+      const gasLines = activeTokenKeys
+        .map((tk) => {
+          const g = GAS_FEES[tk];
+          const label = g.level === "high" ? " ⚠️ HIGH" : g.level === "moderate" ? " (moderate)" : " ✓";
+          return `${CRYPTO_TOKENS[tk].logo} ${CRYPTO_TOKENS[tk].symbol}: $${g.usd.toFixed(3)}${label}`;
+        })
+        .join("\n");
+      const highNames = highGasTokens.map((tk) => CRYPTO_TOKENS[tk].name).join(", ");
+
+      Alert.alert(
+        "⚠️ High Gas Fees Detected",
+        `${highNames} currently has high network fees.\n\nEstimated fees:\n${gasLines}\n\nTotal gas: $${totalGas.toFixed(2)}\n\nDo you want to continue?`,
+        [
+          {
+            text: "Remove Expensive Tokens",
+            style: "cancel",
+            onPress: () => {
+              const updated = { ...selectedTokens };
+              for (const tk of highGasTokens) updated[tk] = false;
+              setSelectedTokens(updated);
+            },
+          },
+          {
+            text: "Continue Anyway",
+            style: "destructive",
+            onPress: doSchedule,
+          },
+        ]
+      );
+    } else {
+      doSchedule();
     }
-    const cryptoNote = `${token.logo} ${cryptoNum} ${token.symbol} → USD · ${token.network}${note ? ` · ${note}` : ""}`;
-    addScheduledPayment({ cardIds: selectedCardIds, date, amounts: amtMap, note: cryptoNote });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onClose();
-    setSelectedCards({});
-    setAmounts({});
-    setCryptoAmt("");
-    setNote("");
   };
 
   return (
@@ -778,56 +878,114 @@ function CryptoScheduleModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Token selector */}
-            <Text style={csch.label}>Crypto Token</Text>
+            {/* ── Multi-token selector ── */}
+            <Text style={csch.label}>Select Tokens (pick one or more)</Text>
             <View style={csch.tokenRow}>
               {(["btc", "eth", "sol"] as TokenKey[]).map((tk) => {
                 const t = CRYPTO_TOKENS[tk];
+                const gas = GAS_FEES[tk];
+                const sel = selectedTokens[tk];
                 return (
                   <Pressable
                     key={tk}
-                    onPress={() => { Haptics.selectionAsync(); setActiveToken(tk); }}
-                    style={[csch.tokenBtn, activeToken === tk && { borderColor: t.color, backgroundColor: `${t.color}18` }]}
+                    onPress={() => toggleToken(tk)}
+                    style={[csch.tokenBtn, sel && { borderColor: t.color, backgroundColor: `${t.color}18` }]}
                   >
-                    <Text style={[csch.tokenLogo, { color: t.color }]}>{t.logo}</Text>
-                    <Text style={[csch.tokenSymbol, activeToken === tk && { color: t.color }]}>{t.symbol}</Text>
+                    <View style={csch.tokenBtnTop}>
+                      <Text style={[csch.tokenLogo, { color: t.color }]}>{t.logo}</Text>
+                      <View style={[csch.tokenCheck, sel && { backgroundColor: t.color, borderColor: t.color }]}>
+                        {sel && <Feather name="check" size={10} color="#fff" />}
+                      </View>
+                    </View>
+                    <Text style={[csch.tokenSymbol, sel && { color: t.color }]}>{t.symbol}</Text>
+                    <View style={[csch.gasPill, { backgroundColor: `${GAS_COLOR[gas.level]}18` }]}>
+                      <Text style={[csch.gasText, { color: GAS_COLOR[gas.level] }]}>
+                        {gas.level === "high" ? "⚠️ " : ""}{gas.level === "low" ? `$${gas.usd.toFixed(3)}` : `$${gas.usd.toFixed(2)}`}
+                      </Text>
+                    </View>
                   </Pressable>
                 );
               })}
             </View>
 
-            {/* Crypto amount */}
-            <Text style={csch.label}>Amount to Convert</Text>
-            <View style={csch.amtRow}>
-              <View style={[csch.amtIcon, { backgroundColor: `${token.color}22` }]}>
-                <Text style={[csch.amtLogo, { color: token.color }]}>{token.logo}</Text>
-              </View>
-              <TextInput
-                style={csch.amtInput}
-                value={cryptoAmt}
-                onChangeText={setCryptoAmt}
-                keyboardType="decimal-pad"
-                placeholder={`0.00 ${token.symbol}`}
-                placeholderTextColor={Colors.textMuted}
-              />
-            </View>
-            {cryptoNum > 0 && (
-              <View style={csch.usdRow}>
-                <Feather name="arrow-right" size={12} color={Colors.textMuted} />
-                <Text style={csch.usdText}>≈ {formatCurrency(usdEquiv)} USD</Text>
-                <Text style={csch.usdRate}>@ ${token.usdPrice.toLocaleString()}/{token.symbol}</Text>
+            {/* ── Amount per token ── */}
+            {activeTokenKeys.length > 0 && (
+              <>
+                <Text style={csch.label}>Amount to Convert</Text>
+                {activeTokenKeys.map((tk) => {
+                  const t = CRYPTO_TOKENS[tk];
+                  const num = parseFloat(cryptoAmts[tk] || "0") || 0;
+                  return (
+                    <View key={tk} style={csch.tokenAmtBlock}>
+                      <View style={csch.amtRow}>
+                        <View style={[csch.amtIcon, { backgroundColor: `${t.color}22` }]}>
+                          <Text style={[csch.amtLogo, { color: t.color }]}>{t.logo}</Text>
+                        </View>
+                        <TextInput
+                          style={csch.amtInput}
+                          value={cryptoAmts[tk]}
+                          onChangeText={(v) => setCryptoAmts((p) => ({ ...p, [tk]: v }))}
+                          keyboardType="decimal-pad"
+                          placeholder={`0.00 ${t.symbol}`}
+                          placeholderTextColor={Colors.textMuted}
+                        />
+                      </View>
+                      <View style={csch.tokenAmtMeta}>
+                        {num > 0 && (
+                          <Text style={csch.usdText}>≈ {formatCurrency(num * t.usdPrice)}</Text>
+                        )}
+                        <Text style={csch.balanceLabel}>
+                          Avail: <Text style={{ color: t.color }}>{t.balance} {t.symbol}</Text>
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {/* ── Gas fee panel ── */}
+            {activeTokenKeys.length > 0 && (
+              <View style={csch.gasBanner}>
+                <View style={csch.gasBannerTop}>
+                  <Feather name="zap" size={14} color="#F59E0B" />
+                  <Text style={csch.gasBannerTitle}>Estimated Network Fees</Text>
+                  <Text style={[csch.gasBannerTotal, highGasTokens.length > 0 && { color: Colors.negative }]}>
+                    ${totalGas.toFixed(2)}
+                  </Text>
+                </View>
+                {activeTokenKeys.map((tk) => {
+                  const g = GAS_FEES[tk];
+                  const t = CRYPTO_TOKENS[tk];
+                  return (
+                    <View key={tk} style={csch.gasRow}>
+                      <Text style={[csch.gasRowLogo, { color: t.color }]}>{t.logo}</Text>
+                      <Text style={csch.gasRowName}>{t.symbol}</Text>
+                      <View style={[csch.gasLevelBadge, { backgroundColor: `${GAS_COLOR[g.level]}18` }]}>
+                        <Text style={[csch.gasLevelText, { color: GAS_COLOR[g.level] }]}>
+                          {g.level.toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={[csch.gasRowAmt, { color: GAS_COLOR[g.level] }]}>
+                        {g.level === "low" ? `$${g.usd.toFixed(3)}` : `$${g.usd.toFixed(2)}`}
+                      </Text>
+                      {g.level === "high" && (
+                        <Pressable onPress={() => toggleToken(tk)} style={csch.gasRemoveBtn}>
+                          <Feather name="x" size={12} color={Colors.negative} />
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+                {highGasTokens.length > 0 && (
+                  <Text style={csch.gasWarning}>
+                    ⚠️ High fees detected. Tap ✕ to remove expensive tokens.
+                  </Text>
+                )}
               </View>
             )}
 
-            {/* Available balance */}
-            <View style={csch.balanceRow}>
-              <Text style={csch.balanceLabel}>Available</Text>
-              <Text style={[csch.balanceVal, { color: token.color }]}>
-                {token.balance} {token.symbol} ({formatCurrency(token.balance * token.usdPrice)})
-              </Text>
-            </View>
-
-            {/* Cards */}
+            {/* ── Cards ── */}
             <Text style={csch.label}>Apply to Cards</Text>
             {cards.map((card) => {
               const selected = !!selectedCards[card.id];
@@ -846,12 +1004,11 @@ function CryptoScheduleModal({
                   {selected && (
                     <TextInput
                       style={csch.cardAmt}
-                      value={amounts[card.id] || ""}
-                      onChangeText={(v) => setAmounts((p) => ({ ...p, [card.id]: v }))}
+                      value={cardAmounts[card.id] || ""}
+                      onChangeText={(v) => setCardAmounts((p) => ({ ...p, [card.id]: v }))}
                       keyboardType="decimal-pad"
                       placeholder="$0.00"
                       placeholderTextColor={Colors.textMuted}
-                      onPress={(e) => e.stopPropagation()}
                     />
                   )}
                   <View style={[csch.checkbox, selected && { backgroundColor: color, borderColor: color }]}>
@@ -861,7 +1018,7 @@ function CryptoScheduleModal({
               );
             })}
 
-            {/* Date */}
+            {/* ── Date ── */}
             <Text style={csch.label}>Payment Date</Text>
             <View style={csch.dateRow}>
               <Feather name="calendar" size={16} color={Colors.primary} />
@@ -874,7 +1031,7 @@ function CryptoScheduleModal({
               />
             </View>
 
-            {/* Note */}
+            {/* ── Note ── */}
             <Text style={csch.label}>Note (optional)</Text>
             <TextInput
               style={csch.noteInput}
@@ -885,20 +1042,40 @@ function CryptoScheduleModal({
               multiline
             />
 
-            {/* Info banner */}
+            {/* ── Info ── */}
             <View style={csch.infoBanner}>
-              <Feather name="info" size={14} color={token.color} />
+              <Feather name="info" size={14} color={Colors.primary} />
               <Text style={csch.infoText}>
-                {token.name} will be swapped to USD at market rate on the payment date. Standard ACH processing applies after conversion.
+                Each selected token is swapped to USD at market rate on the payment date. Standard ACH processing applies after conversion. Crypto payments cannot be automated.
               </Text>
             </View>
 
+            {/* ── Total summary ── */}
+            {activeTokenKeys.length > 0 && (
+              <View style={csch.totalRow}>
+                <Text style={csch.totalLabel}>Total Conversion</Text>
+                <Text style={csch.totalVal}>{formatCurrency(totalUsd)} USD</Text>
+              </View>
+            )}
+
             <Pressable
               onPress={handleSchedule}
-              style={({ pressed }) => [csch.schedBtn, { backgroundColor: token.color }, pressed && { opacity: 0.8 }]}
+              style={({ pressed }) => [csch.schedBtn, pressed && { opacity: 0.8 }]}
             >
-              <Text style={csch.schedLogo}>{token.logo}</Text>
-              <Text style={csch.schedBtnText}>Schedule Crypto Payment</Text>
+              <LinearGradient
+                colors={["#7C3AED", "#4F7FFF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={csch.schedBtnGrad}
+              >
+                <Feather name="zap" size={16} color="#fff" />
+                <Text style={csch.schedBtnText}>Schedule Crypto Payment</Text>
+                {highGasTokens.length > 0 && (
+                  <View style={csch.schedBtnWarn}>
+                    <Text style={csch.schedBtnWarnText}>⚠️</Text>
+                  </View>
+                )}
+              </LinearGradient>
             </Pressable>
           </ScrollView>
         </View>
@@ -1324,82 +1501,9 @@ export default function PayScreen() {
           </>
         )}
 
-        {/* ── Action icon buttons: Pay | Crypto ── */}
-        <View style={styles.actionIconsRow}>
-          {/* Pay button */}
-          <Pressable
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
-            style={({ pressed }) => [styles.actionIconCard, pressed && { opacity: 0.85 }]}
-          >
-            <LinearGradient
-              colors={[Colors.primaryDark, "#6C9EFF"]}
-              start={{ x: 0, y: 1 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.actionIconGrad}
-            >
-              <View style={styles.actionIconInner}>
-                <Feather name="credit-card" size={26} color="#fff" />
-                <Text style={styles.actionIconLabel}>Pay</Text>
-                <Pressable
-                  onPress={(e) => { e.stopPropagation(); handlePayAll(); }}
-                  style={styles.payAllPill}
-                >
-                  <Feather name="zap" size={11} color={Colors.primaryDark} />
-                  <Text style={styles.payAllPillText}>Pay All</Text>
-                </Pressable>
-              </View>
-            </LinearGradient>
-          </Pressable>
-
-          {/* Crypto button */}
-          <Pressable
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setCryptoVisible(true); }}
-            style={({ pressed }) => [styles.actionIconCard, pressed && { opacity: 0.85 }]}
-          >
-            <LinearGradient
-              colors={["#1a1033", "#2d1060"]}
-              start={{ x: 0, y: 1 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.actionIconGrad}
-            >
-              <View style={styles.actionIconInner}>
-                <View style={styles.cryptoIconStack}>
-                  {(["btc", "eth", "sol"] as TokenKey[]).map((tk, i) => (
-                    <Text key={tk} style={[styles.cryptoStackLogo, { color: CRYPTO_TOKENS[tk].color, marginLeft: i > 0 ? -6 : 0 }]}>
-                      {CRYPTO_TOKENS[tk].logo}
-                    </Text>
-                  ))}
-                </View>
-                <Text style={styles.actionIconLabel}>Crypto</Text>
-                <Pressable
-                  onPress={(e) => { e.stopPropagation(); setCryptoVisible(true); }}
-                  style={[styles.payAllPill, { backgroundColor: "rgba(153,69,255,0.15)", borderColor: "rgba(153,69,255,0.4)" }]}
-                >
-                  <Text style={[styles.payAllPillText, { color: "#9945FF" }]}>Pay All</Text>
-                </Pressable>
-              </View>
-            </LinearGradient>
-          </Pressable>
-        </View>
-
-        {/* Transaction filter row */}
-        <View style={styles.filterRow}>
-          <Text style={styles.sectionTitle}>Transaction History</Text>
-          <View style={styles.filters}>
-            {FILTERS.map((f) => (
-              <Pressable
-                key={f}
-                onPress={() => setFilter(f)}
-                style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-              >
-                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
       </View>
 
-      {/* ── Scrollable transaction list ── */}
+      {/* ── Scrollable section: action icons + transactions ── */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -1415,6 +1519,81 @@ export default function PayScreen() {
             <Feather name="inbox" size={32} color={Colors.textMuted} />
             <Text style={styles.emptyText}>No transactions found</Text>
           </View>
+        )}
+        ListHeaderComponent={() => (
+          <>
+            {/* ── Action icon buttons: Pay | Crypto ── */}
+            <View style={styles.actionIconsRow}>
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
+                style={({ pressed }) => [styles.actionIconCard, pressed && { opacity: 0.85 }]}
+              >
+                <LinearGradient
+                  colors={[Colors.primaryDark, "#6C9EFF"]}
+                  start={{ x: 0, y: 1 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.actionIconGrad}
+                >
+                  <View style={styles.actionIconInner}>
+                    <Feather name="credit-card" size={26} color="#fff" />
+                    <Text style={styles.actionIconLabel}>Pay</Text>
+                    <Pressable
+                      onPress={(e) => { e.stopPropagation(); handlePayAll(); }}
+                      style={styles.payAllPill}
+                    >
+                      <Feather name="zap" size={11} color={Colors.primaryDark} />
+                      <Text style={styles.payAllPillText}>Pay All</Text>
+                    </Pressable>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setCryptoVisible(true); }}
+                style={({ pressed }) => [styles.actionIconCard, pressed && { opacity: 0.85 }]}
+              >
+                <LinearGradient
+                  colors={["#1a1033", "#2d1060"]}
+                  start={{ x: 0, y: 1 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.actionIconGrad}
+                >
+                  <View style={styles.actionIconInner}>
+                    <View style={styles.cryptoIconStack}>
+                      {(["btc", "eth", "sol"] as TokenKey[]).map((tk, i) => (
+                        <Text key={tk} style={[styles.cryptoStackLogo, { color: CRYPTO_TOKENS[tk].color, marginLeft: i > 0 ? -6 : 0 }]}>
+                          {CRYPTO_TOKENS[tk].logo}
+                        </Text>
+                      ))}
+                    </View>
+                    <Text style={styles.actionIconLabel}>Crypto</Text>
+                    <Pressable
+                      onPress={(e) => { e.stopPropagation(); setCryptoVisible(true); }}
+                      style={[styles.payAllPill, { backgroundColor: "rgba(153,69,255,0.15)", borderColor: "rgba(153,69,255,0.4)" }]}
+                    >
+                      <Text style={[styles.payAllPillText, { color: "#9945FF" }]}>Pay All</Text>
+                    </Pressable>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            </View>
+
+            {/* Transaction filter row */}
+            <View style={styles.filterRow}>
+              <Text style={styles.sectionTitle}>Transaction History</Text>
+              <View style={styles.filters}>
+                {FILTERS.map((f) => (
+                  <Pressable
+                    key={f}
+                    onPress={() => setFilter(f)}
+                    style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+                  >
+                    <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </>
         )}
       />
 
@@ -2422,6 +2601,46 @@ const sch = StyleSheet.create({
     fontSize: 15,
     color: "#fff",
   },
+  autoPayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  autoPayTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  autoPaySub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  autoPayBanner: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+    backgroundColor: "rgba(108,158,255,0.08)",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "rgba(108,158,255,0.25)",
+  },
+  autoPayBannerText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
 });
 
 // ─── CryptoLogo styles ────────────────────────────────────────────────────────
@@ -2679,14 +2898,163 @@ const csch = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  schedLogo: {
-    fontSize: 16,
-    color: "#fff",
+  schedBtnGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 8,
   },
   schedBtnText: {
     fontFamily: "Inter_700Bold",
     fontSize: 15,
     color: "#fff",
+  },
+  schedBtnWarn: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  schedBtnWarnText: {
+    fontSize: 12,
+  },
+
+  // multi-token selector extras
+  tokenBtnTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 4,
+  },
+  tokenCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gasPill: {
+    borderRadius: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  gasText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+  },
+
+  // per-token amount block
+  tokenAmtBlock: {
+    marginBottom: 12,
+  },
+  tokenAmtMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 6,
+  },
+
+  // gas fee panel
+  gasBanner: {
+    backgroundColor: "rgba(245,158,11,0.07)",
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.25)",
+    gap: 10,
+  },
+  gasBannerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  gasBannerTitle: {
+    flex: 1,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#F59E0B",
+  },
+  gasBannerTotal: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: "#F59E0B",
+  },
+  gasRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  gasRowLogo: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    width: 18,
+    textAlign: "center",
+  },
+  gasRowName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    width: 32,
+  },
+  gasLevelBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  gasLevelText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  gasRowAmt: {
+    flex: 1,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    textAlign: "right",
+  },
+  gasRemoveBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,107,138,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gasWarning: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.negative,
+    lineHeight: 18,
+  },
+
+  // total row
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  totalLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  totalVal: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.positive,
   },
 });
 
