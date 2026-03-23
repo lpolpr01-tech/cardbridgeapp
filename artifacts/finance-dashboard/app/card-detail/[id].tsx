@@ -363,7 +363,16 @@ export default function CardDetailScreen() {
             {/* Horizontally scrollable info: Rewards + Billing */}
             <CardInfoScroll rewards={card.rewards} cardId={card.id} balance={card.balance} />
 
-            <Text style={styles.sectionTitle}>Transactions</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Transactions</Text>
+              <Pressable
+                onPress={() => router.push({ pathname: "/card-transactions/[id]", params: { id: card.id } })}
+                style={({ pressed }) => [styles.seeAllBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.seeAllText}>See all</Text>
+                <Feather name="chevron-right" size={14} color={Colors.primary} />
+              </Pressable>
+            </View>
           </>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -494,7 +503,10 @@ const styles = StyleSheet.create({
   rewardBoxValue: { fontFamily: "Inter_700Bold", fontSize: 20 },
   rewardBoxSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted },
 
-  sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.textPrimary, paddingHorizontal: 20, paddingBottom: 8 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 8 },
+  sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.textPrimary },
+  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4, paddingHorizontal: 8 },
+  seeAllText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.primary },
   separator: { height: 1, backgroundColor: Colors.divider, marginHorizontal: 20 },
   empty: { paddingTop: 40, alignItems: "center", gap: 10 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textMuted },
