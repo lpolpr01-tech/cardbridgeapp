@@ -1,3 +1,25 @@
+# Finance Dashboard — Mobile Fintech App (Expo React Native)
+
+## Key Components (artifacts/finance-dashboard/)
+- `components/CreditProfile.tsx` — Full credit intelligence section: `CreditProfileSection` (parent), `CreditScoreOverviewCard`, `CreditHealthCard`, `DebtSummaryCard`, `ScoreFactorsCard`, `PersonalizedRecommendationsCard`. Supports loading/success/partial/no_data/error states, skeleton shimmer loaders, FadeSlideIn entrance animations, TypeScript interfaces + mock data.
+- `components/WalletCardStack.tsx` — Stacked wallet cards with theme customization
+- `components/BalanceHeader.tsx` — Top balance summary header
+- `app/(tabs)/index.tsx` — Card List screen; renders BalanceHeader → WalletCardStack → SubscriptionsRow → CreditProfileSection
+- `app/(tabs)/pay.tsx` — Pay tab with ACH/crypto scheduling, Pay All preview modals, confetti + success overlay, USDC↔USD swap in CryptoModal
+- `app/(tabs)/options.tsx` — Options/settings tab with damask + glass styling
+- `context/ThemeContext.tsx` — App-wide theme (deep purple-blue default)
+- `context/FinanceContext.tsx` — Cards, transactions, balance state
+- `constants/colors.ts` — Design tokens (primary, positive, negative, textPrimary, textMuted, divider, etc.)
+- `assets/images/bg-damask.png` — Luxury damask texture background (opacity 0.09–0.13)
+
+## Design System
+- Glass cards: `backgroundColor: "rgba(28,14,70,0.88)"`, `borderColor: "rgba(255,255,255,0.11)"`, inline `backdropFilter/boxShadow`
+- `backdropFilter` and `boxShadow` MUST be inline styles with `as any` cast — NOT in StyleSheet.create()
+- `pointerEvents` must be in style object inline `{ pointerEvents: "none" } as any`
+- Theme gradient: `#1A103F → #2D1B69`; primary `#6C9EFF`; positive `#4ADEAA`; negative `#FF6B8A`
+
+---
+
 # Workspace
 
 ## Overview

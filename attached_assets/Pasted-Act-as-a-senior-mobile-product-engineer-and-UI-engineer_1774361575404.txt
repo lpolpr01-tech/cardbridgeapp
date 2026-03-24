@@ -1,0 +1,188 @@
+Act as a senior mobile product engineer and UI engineer. Update my existing mobile fintech app without changing the luxury purple design language, spacing system, tab framework, or overall visual hierarchy.
+
+I want you to improve the Card List screen so the user can see their credit profile directly in the same place where the current “Credit Scores” section already exists, and then continue scrolling downward for more private personalized credit information.
+
+GOAL
+Transform the current Credit Scores card into the beginning of a larger personalized credit intelligence section on the Card List tab. This section must remain private to the logged-in user and should feel clean, premium, readable, and native to the current app design.
+
+MAIN UX REQUIREMENT
+- Keep the Credit Scores section in the Card List exactly where it currently appears in the scroll flow.
+- Do not move it to another tab.
+- Expand that area into a vertically stacked personalized credit section.
+- The user should first see the 3-bureau scores summary card, then be able to scroll down for:
+  1. credit health
+  2. debt summary
+  3. key factors affecting score
+  4. utilization and payment insights
+- Everything should feel like a continuation of the existing screen.
+
+SECTION ORDER ON CARD LIST
+Keep the current top area of the Card List as is, then after the existing cards and subscription section:
+
+1. Credit Scores Overview Card
+2. Credit Health Card
+3. Debt Summary Card
+4. Score Factors / Insights Card
+5. Personalized Recommendations Card
+
+CREDIT SCORES OVERVIEW CARD
+Replace the static mock content with a dynamic private personalized component that displays:
+- Average score
+- Equifax score
+- Experian score
+- TransUnion score
+- Score category label such as Excellent, Very Good, Good, Fair, Poor
+- “Updated today” or “Last updated X hours ago”
+- Small disclaimer text at the bottom saying scores are educational estimates unless a provider returns lender-grade scores
+
+Keep the same premium style already shown in the UI:
+- rounded corners
+- deep purple glassmorphism card styling
+- subtle borders
+- soft glow accents
+- neon green/yellow score emphasis
+- bureau names laid out evenly in 3 columns
+- score gauge stays elegant and readable
+
+CREDIT HEALTH CARD
+Directly below the scores card, add a new card titled “Credit Health”.
+This card should summarize the user’s profile in a simple but premium way using private personalized data:
+- Overall health status: Excellent / Good / Needs Attention
+- Payment history
+- Credit utilization
+- Average account age
+- Recent inquiries
+- Derogatory marks or none reported
+
+Display this with:
+- compact labeled rows or stat pills
+- small icons
+- color-coded indicators that match the existing app palette
+- no harsh reds unless absolutely necessary
+- polished spacing and easy readability
+
+DEBT SUMMARY CARD
+Below Credit Health, add a new “Debt Summary” card.
+This should show:
+- Total revolving debt
+- Total installment debt
+- Total overall debt
+- Number of open credit accounts
+- Number of loans
+- Monthly minimum payments
+- Highest balance account
+- Optional debt-to-limit ratio if data exists
+
+Also add a clean breakdown list for account types:
+- Credit cards
+- Auto loans
+- Personal loans
+- Student loans
+- Other liabilities
+
+Keep it visually elegant and avoid clutter. Use collapsible subsections only if necessary, but default to a clean summary-first view.
+
+SCORE FACTORS / INSIGHTS CARD
+Below Debt Summary, add a card titled “What’s Affecting Your Score”.
+Show the biggest personalized factors such as:
+- high utilization
+- low average age of accounts
+- recent hard inquiries
+- missed payments
+- strong on-time payment history
+- healthy credit mix
+
+Each factor should have:
+- short title
+- 1 sentence explanation
+- positive, neutral, or negative visual state
+
+PERSONALIZED RECOMMENDATIONS CARD
+Add a final card with actionable suggestions such as:
+- Pay down card X to reduce utilization
+- Keep statement balance below a target amount
+- Avoid opening another account soon
+- Maintain on-time payments
+- Check for errors if score changed unexpectedly
+
+These recommendations must feel personalized, short, and private.
+
+DATA / PRODUCT BEHAVIOR
+Build the UI so it supports live private user-specific data from backend integrations later.
+For now:
+- create clean TypeScript interfaces / mock data models
+- make every field dynamic
+- no hardcoded bureau values in the final component logic except fallback mock data
+- gracefully handle loading, unavailable bureau data, and partial results
+- if only 1 or 2 bureaus are available, the UI should still render elegantly
+- add skeleton loaders for cards while data is loading
+- add empty states for users who have not connected credit data yet
+
+PRIVACY REQUIREMENTS
+This area is private and personalized for the signed-in user.
+Reflect that in the UI with subtle cues such as:
+- “Private to you”
+- “Securely synced”
+- “Visible only on your account”
+Do not overdo it, just enough to build trust.
+
+DESIGN REQUIREMENTS
+- Preserve the luxury dark purple fintech aesthetic already used in the app
+- Match the same tab background treatment and card framework
+- Keep the same rounded premium card style
+- Maintain soft shadows, glow, and translucent surfaces
+- Use the same typography style and spacing rhythm already present
+- Make it feel like this feature has always belonged in the app
+- Do not create a totally different visual system
+- Keep it mobile-first and optimized for iPhone-sized screens
+
+SCROLL BEHAVIOR
+The entire credit section must be vertically scrollable as part of the Card List page.
+The user should naturally scroll from card accounts into:
+Credit Scores → Credit Health → Debt Summary → Insights → Recommendations
+
+IMPLEMENTATION REQUIREMENTS
+- Use reusable React components
+- Use TypeScript
+- Keep component structure clean and modular
+- Create separate components for:
+  - CreditScoreOverviewCard
+  - CreditHealthCard
+  - DebtSummaryCard
+  - ScoreFactorsCard
+  - PersonalizedRecommendationsCard
+- Add a parent section component like CreditProfileSection
+- Plug the parent section into the Card List screen exactly where the current Credit Scores card is
+- Maintain responsiveness and smooth animation
+- Use subtle entrance animations or fade/slide-up transitions that match the premium feel
+- Do not cause layout shift or break the rest of the Card List page
+
+STATE HANDLING
+Support these states:
+- loading
+- success
+- partial data
+- no data connected
+- error fetching data
+
+NO DATA CONNECTED STATE
+If the user has not connected their credit data yet, show an elegant onboarding card in the same section with:
+- title: “Connect your credit profile”
+- subtitle explaining they can privately view bureau scores, credit health, and debt summary
+- premium CTA button such as “Connect securely”
+- maintain the same app aesthetic
+
+DELIVERABLE
+Return the full production-ready code changes needed to implement this on the Card List screen, including:
+- components
+- types
+- mock data
+- integration points for future APIs
+- loading and empty states
+- any needed styling updates
+
+IMPORTANT
+Do not redesign the rest of the app.
+Do not move this feature out of Card List.
+Do not create a separate credit tab.
+Simply turn the existing Credit Scores area into the first card of a larger scrollable personalized credit section directly beneath it.

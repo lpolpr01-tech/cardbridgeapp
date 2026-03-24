@@ -21,118 +21,7 @@ import { BalanceHeader } from "@/components/BalanceHeader";
 import { WalletCardStack } from "@/components/WalletCardStack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const BUREAUS = [
-  { name: "Equifax",   score: 742, color: "#FF6B9D" },
-  { name: "Experian",  score: 738, color: "#6C9EFF" },
-  { name: "TransUnion",score: 745, color: "#4ADEAA" },
-];
-const SCORE_MIN = 300;
-const SCORE_MAX = 850;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getCategory(score: number): string {
-  if (score >= 750) return "Excellent";
-  if (score >= 700) return "Good";
-  if (score >= 650) return "Fair";
-  if (score >= 580) return "Poor";
-  return "Very Poor";
-}
-function getCategoryColor(score: number): string {
-  if (score >= 750) return Colors.positive;
-  if (score >= 700) return "#A3E635";
-  if (score >= 650) return "#FBBF24";
-  return Colors.negative;
-}
-
-// ─── Score Arc ────────────────────────────────────────────────────────────────
-
-function ScoreArc({ score, color }: { score: number; color: string }) {
-  const pct = (score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN);
-  return (
-    <View style={cs.arcWrap}>
-      <View style={cs.arcBg}>
-        <View style={[cs.arcFill, { width: `${pct * 100}%` as any, backgroundColor: color }]} />
-      </View>
-      <Text style={[cs.scoreNum, { color }]}>{score}</Text>
-    </View>
-  );
-}
-
-// ─── Credit Score Panel ───────────────────────────────────────────────────────
-
-function CreditScorePanel() {
-  const avgScore = Math.round(BUREAUS.reduce((s, b) => s + b.score, 0) / BUREAUS.length);
-  const avgCategory = getCategory(avgScore);
-  const avgColor = getCategoryColor(avgScore);
-
-  return (
-    <View style={[cs.panel, { backdropFilter: "blur(20px) saturate(140%)", boxShadow: "0px 8px 32px rgba(0,0,0,0.5), inset 0px 1px 0px rgba(180,130,255,0.12)" } as any]}>
-      <View style={cs.header}>
-        <View style={cs.headerLeft}>
-          <Feather name="shield" size={16} color={Colors.primary} />
-          <Text style={cs.title}>Credit Scores</Text>
-        </View>
-        <View style={cs.updatedBadge}>
-          <View style={cs.updatedDot} />
-          <Text style={cs.updatedText}>Updated today</Text>
-        </View>
-      </View>
-
-      <View style={cs.avgRow}>
-        <Text style={cs.avgLabel}>Average Score</Text>
-        <View style={cs.avgRight}>
-          <Text style={[cs.avgScore, { color: avgColor }]}>{avgScore}</Text>
-          <Text style={[cs.avgCategory, { color: avgColor }]}>{avgCategory}</Text>
-        </View>
-      </View>
-
-      <View style={cs.barWrap}>
-        <LinearGradient
-          colors={["#FF6B6B", "#FBBF24", "#A3E635", "#4ADEAA"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={cs.barTrack}
-        />
-        <View style={[cs.barIndicator, { left: `${((avgScore - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100}%` as any }]}>
-          <View style={[cs.barDot, { borderColor: avgColor }]} />
-        </View>
-        <View style={cs.barLabels}>
-          {["300", "500", "650", "750", "850"].map((l) => (
-            <Text key={l} style={cs.barLabel}>{l}</Text>
-          ))}
-        </View>
-      </View>
-
-      <View style={cs.bureauxRow}>
-        {BUREAUS.map((b, i) => (
-          <React.Fragment key={b.name}>
-            {i > 0 && <View style={cs.bureauDivider} />}
-            <View style={cs.bureauItem}>
-              <Text style={cs.bureauName}>{b.name}</Text>
-              <ScoreArc score={b.score} color={b.color} />
-              <View style={cs.bureauBarBg}>
-                <View style={[cs.bureauBarFill, {
-                  width: `${((b.score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100}%` as any,
-                  backgroundColor: b.color,
-                }]} />
-              </View>
-              <Text style={[cs.bureauCategory, { color: getCategoryColor(b.score) }]}>
-                {getCategory(b.score)}
-              </Text>
-            </View>
-          </React.Fragment>
-        ))}
-      </View>
-      <Text style={cs.disclaimer}>
-        Scores are estimates for informational purposes only and may differ from lender scores.
-      </Text>
-    </View>
-  );
-}
+import { CreditProfileSection } from "@/components/CreditProfile";
 
 // ─── Subscriptions Row ────────────────────────────────────────────────────────
 
@@ -695,7 +584,7 @@ export default function CardListScreen() {
         <BalanceHeader totalBalance={totalBalance} />
         <WalletCardStack cards={cards} transactionCounts={transactionCounts} />
         <SubscriptionsRow />
-        <CreditScorePanel />
+        <CreditProfileSection status="success" />
       </ScrollView>
 
       {/* Floating Bubble Menu */}
@@ -755,63 +644,3 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 140 },
 });
 
-// ─── Credit Score Styles ──────────────────────────────────────────────────────
-
-const cs = StyleSheet.create({
-  panel: {
-    marginHorizontal: 20, marginTop: 8,
-    backgroundColor: "rgba(28,14,70,0.88)",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
-    overflow: "hidden",
-    elevation: 8,
-  },
-  header: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10,
-  },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.textPrimary },
-  updatedBadge: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(74,222,170,0.1)", borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(74,222,170,0.2)",
-  },
-  updatedDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.positive },
-  updatedText: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.positive },
-  avgRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingBottom: 10,
-  },
-  avgLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
-  avgRight: { flexDirection: "row", alignItems: "baseline", gap: 8 },
-  avgScore: { fontFamily: "Inter_700Bold", fontSize: 26 },
-  avgCategory: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  barWrap: { marginHorizontal: 16, marginBottom: 16, position: "relative" },
-  barTrack: { height: 8, borderRadius: 4, marginBottom: 4 },
-  barIndicator: { position: "absolute", top: -4, alignItems: "center" },
-  barDot: {
-    width: 16, height: 16, borderRadius: 8, backgroundColor: "#fff",
-    borderWidth: 3, borderColor: Colors.primaryDark,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4, shadowRadius: 4, elevation: 4, marginLeft: -8,
-  },
-  barLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
-  barLabel: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted },
-  bureauxRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: Colors.divider },
-  bureauItem: { flex: 1, alignItems: "center", paddingVertical: 14, paddingHorizontal: 4, gap: 5 },
-  bureauDivider: { width: 1, backgroundColor: Colors.divider, marginVertical: 12 },
-  bureauName: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
-  bureauBarBg: { width: "70%", height: 4, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" },
-  bureauBarFill: { height: 4, borderRadius: 2 },
-  bureauCategory: { fontFamily: "Inter_500Medium", fontSize: 10 },
-  arcWrap: { alignItems: "center", gap: 4 },
-  arcBg: { width: 48, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
-  arcFill: { height: 6, borderRadius: 3 },
-  scoreNum: { fontFamily: "Inter_700Bold", fontSize: 20 },
-  disclaimer: {
-    fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textMuted,
-    textAlign: "center", paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4, lineHeight: 15,
-  },
-});
