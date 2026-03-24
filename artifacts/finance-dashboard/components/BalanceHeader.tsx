@@ -21,7 +21,7 @@ export function BalanceHeader({ totalBalance }: Props) {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Text style={styles.greeting}>Good morning</Text>
-      <Text style={styles.name}>Alex Johnson</Text>
+      <Text style={styles.name}>Luis Pol</Text>
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Total Balance</Text>
         <Text style={styles.balanceAmount}>{formatCurrency(totalBalance)}</Text>
