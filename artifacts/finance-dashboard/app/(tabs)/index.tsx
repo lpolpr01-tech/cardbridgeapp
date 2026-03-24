@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import {
   Animated,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -676,6 +677,12 @@ export default function CardListScreen() {
 
   return (
     <LinearGradient colors={[theme.bgStart, theme.bgEnd]} style={styles.gradient}>
+      {/* Damask texture overlay */}
+      <Image
+        source={require("../../assets/images/bg-damask.png")}
+        style={styles.bgTexture}
+        resizeMode="cover"
+      />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -735,6 +742,12 @@ const sub = StyleSheet.create({
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
+  bgTexture: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    opacity: 0.13,
+  },
   scrollContent: { paddingBottom: 140 },
 });
 
