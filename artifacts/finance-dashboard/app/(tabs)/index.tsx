@@ -70,7 +70,7 @@ function CreditScorePanel() {
   const avgColor = getCategoryColor(avgScore);
 
   return (
-    <View style={cs.panel}>
+    <View style={[cs.panel, { backdropFilter: "blur(20px) saturate(140%)", boxShadow: "0px 8px 32px rgba(0,0,0,0.5), inset 0px 1px 0px rgba(180,130,255,0.12)" } as any]}>
       <View style={cs.header}>
         <View style={cs.headerLeft}>
           <Feather name="shield" size={16} color={Colors.primary} />
@@ -146,7 +146,7 @@ function SubscriptionsRow() {
   const total = SUBSCRIPTIONS.reduce((s, x) => s + x.amount, 0);
 
   return (
-    <Pressable onPress={() => { Haptics.selectionAsync(); router.push("/subscriptions"); }} style={sub.wrap}>
+    <Pressable onPress={() => { Haptics.selectionAsync(); router.push("/subscriptions"); }} style={[sub.wrap, { backdropFilter: "blur(20px) saturate(140%)", boxShadow: "0px 8px 32px rgba(0,0,0,0.5), inset 0px 1px 0px rgba(180,130,255,0.12)" } as any]}>
       <View style={sub.left}>
         <View style={sub.iconWrap}>
           <Feather name="repeat" size={16} color={Colors.primary} />
@@ -720,8 +720,12 @@ const sub = StyleSheet.create({
   wrap: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     marginHorizontal: 20, marginTop: 10, marginBottom: 6,
-    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 16,
-    padding: 14, borderWidth: 1, borderColor: Colors.divider,
+    backgroundColor: "rgba(28,14,70,0.88)",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)",
+    elevation: 8,
   },
   left: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   iconWrap: {
@@ -756,8 +760,12 @@ const styles = StyleSheet.create({
 const cs = StyleSheet.create({
   panel: {
     marginHorizontal: 20, marginTop: 8,
-    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 18,
-    borderWidth: 1, borderColor: Colors.divider, overflow: "hidden",
+    backgroundColor: "rgba(28,14,70,0.88)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)",
+    overflow: "hidden",
+    elevation: 8,
   },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

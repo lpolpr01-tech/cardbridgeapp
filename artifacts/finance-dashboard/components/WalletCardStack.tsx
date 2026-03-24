@@ -504,7 +504,7 @@ export function WalletCardStack({ cards, transactionCounts }: Props) {
       </View>
 
       {/* ── Rewards & Last Payment Overview ── */}
-      <View style={ov.panel}>
+      <View style={[ov.panel, { backdropFilter: "blur(20px) saturate(140%)", boxShadow: "0px 8px 32px rgba(0,0,0,0.5), inset 0px 1px 0px rgba(180,130,255,0.12)" } as any]}>
         <View style={ov.rewardsRow}>
           <View style={ov.rewardItem}>
             <View style={ov.rewardIcon}>
@@ -673,12 +673,13 @@ const chip = StyleSheet.create({
 
 const ov = StyleSheet.create({
   panel: {
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(28,14,70,0.88)",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: "rgba(255,255,255,0.11)",
     overflow: "hidden",
     marginBottom: 8,
+    elevation: 8,
   },
   rewardsRow: { flexDirection: "row", paddingVertical: 14 },
   rewardItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16 },

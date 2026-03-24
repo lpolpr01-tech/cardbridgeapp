@@ -1,0 +1,37 @@
+Refine the UI styling so the content cards are clearly separated from the patterned purple background.
+
+Goal:
+The background pattern should stay visible only behind the layout, not visually pass through the credit score card, subscriptions card, top stat cards, or any content container. Right now the boxes blend too much with the background and reduce readability.
+
+What I want:
+- Make every main content card feel like a distinct surface layer above the background
+- Use either:
+  1. a solid premium surface, or
+  2. a frosted glass / blurred translucent surface
+- Keep the luxury purple theme, but prevent the ornamental background from overlapping visually with text, numbers, icons, and charts
+
+Design direction:
+- Cards should have a stronger separation from the wallpaper
+- Use a semi-opaque fill such as deep violet / plum / indigo glass
+- Add backdrop blur so the background behind the cards becomes soft and diffused
+- Increase card background opacity enough that all text and data are easy to read
+- Keep a subtle glassmorphism look, but prioritize legibility over transparency
+- Add a faint border with low-opacity white or lavender
+- Add a soft shadow so cards appear elevated above the background
+- Inner highlights are okay, but keep them subtle and premium
+
+Important:
+- Do NOT let the floral/pattern background show sharply through the cards
+- The credit score area, score boxes, subscriptions card, and top info panels should all sit on cleaner surfaces
+- The background should feel decorative, while the cards should feel functional and readable
+- Maintain the luxury fintech aesthetic
+- Avoid overly flat gray panels; keep it rich, purple, elegant, and modern
+
+Recommended visual treatment:
+- card background: rgba(40, 22, 80, 0.72) to rgba(55, 30, 105, 0.82)
+- backdrop-filter: blur(18px) saturate(140%)
+- border: 1px solid rgba(255,255,255,0.10)
+- box-shadow: soft deep shadow for elevation
+- slightly brighter top edge highlight for premium depth
+
+Please update the card/container styles across the dashboard so the UI looks layered, polished, and readable, with the patterned background no longer competing with the content.
