@@ -1859,10 +1859,9 @@ export default function PayScreen() {
 
       {/* ── Custom thin scrollbar ── */}
       <Animated.View
-        pointerEvents="none"
         style={[
           styles.scrollTrack,
-          { top: insets.top, bottom: insets.bottom + 80, opacity: thumbAnim },
+          { top: insets.top, bottom: insets.bottom + 80, opacity: thumbAnim, pointerEvents: "none" } as any,
         ]}
       >
         <Animated.View

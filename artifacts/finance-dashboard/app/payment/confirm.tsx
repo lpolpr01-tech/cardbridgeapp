@@ -146,7 +146,7 @@ export default function ConfirmScreen() {
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 32 }]}>
       {/* Confetti */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
         {PIECES.map((piece, i) => (
           <ConfettiParticle key={i} piece={piece} index={i} />
         ))}

@@ -142,7 +142,7 @@ function BackgroundPattern({ pattern }: { pattern: PatternName }) {
 
   if (pattern === "dots") {
     return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
         {Array.from({ length: rows }).map((_, r) =>
           Array.from({ length: cols }).map((_, c) => (
             <View
@@ -165,7 +165,7 @@ function BackgroundPattern({ pattern }: { pattern: PatternName }) {
 
   if (pattern === "grid") {
     return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
         {Array.from({ length: rows + 1 }).map((_, r) => (
           <View key={`h-${r}`} style={{ position: "absolute", left: 0, right: 0, top: r * GRID, height: 1, backgroundColor: "rgba(255,255,255,0.04)" }} />
         ))}
@@ -178,7 +178,7 @@ function BackgroundPattern({ pattern }: { pattern: PatternName }) {
 
   if (pattern === "lines") {
     return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
         {Array.from({ length: rows * 2 }).map((_, r) => (
           <View
             key={r}
