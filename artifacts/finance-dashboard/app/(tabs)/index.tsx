@@ -1,13 +1,16 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BalanceHeader } from "@/components/BalanceHeader";
 import { WalletCardStack } from "@/components/WalletCardStack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
 
 const BUREAUS = [
   { name: "Equifax", score: 742, color: "#FF6B9D" },
@@ -120,6 +123,41 @@ function CreditScorePanel() {
   );
 }
 
+function SubscriptionsRow() {
+  const { cards } = useFinance();
+  const total = SUBSCRIPTIONS.reduce((s, sub) => s + sub.amount, 0);
+  const cardTotals = cards.map((c) => ({
+    ...c,
+    subs: SUBSCRIPTIONS.filter((s) => s.cardId === c.id),
+    color: CARD_COLORS[c.id] || Colors.primary,
+  }));
+  return (
+    <Pressable
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/subscriptions"); }}
+      style={({ pressed }) => [sub.wrap, pressed && { opacity: 0.85 }]}
+    >
+      <View style={sub.left}>
+        <View style={sub.iconWrap}>
+          <Feather name="repeat" size={16} color={Colors.primary} />
+        </View>
+        <View style={sub.info}>
+          <Text style={sub.title}>Subscriptions</Text>
+          <View style={sub.dots}>
+            {cardTotals.map((c) => (
+              <View key={c.id} style={[sub.dot, { backgroundColor: c.color }]} />
+            ))}
+            <Text style={sub.subCount}>{SUBSCRIPTIONS.length} active autopays</Text>
+          </View>
+        </View>
+      </View>
+      <View style={sub.right}>
+        <Text style={sub.amt}>${total.toFixed(2)}<Text style={sub.mo}>/mo</Text></Text>
+        <Feather name="chevron-right" size={16} color={Colors.textMuted} />
+      </View>
+    </Pressable>
+  );
+}
+
 export default function CardListScreen() {
   const { cards, transactions, totalBalance } = useFinance();
   const { theme } = useTheme();
@@ -142,11 +180,63 @@ export default function CardListScreen() {
       >
         <BalanceHeader totalBalance={totalBalance} />
         <WalletCardStack cards={cards} transactionCounts={transactionCounts} />
+        <SubscriptionsRow />
         <CreditScorePanel />
       </ScrollView>
     </LinearGradient>
   );
 }
+
+const sub = StyleSheet.create({
+  wrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  left: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(108,158,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(108,158,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  info: { gap: 4 },
+  title: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  dots: { flexDirection: "row", alignItems: "center", gap: 5 },
+  dot: { width: 7, height: 7, borderRadius: 3.5 },
+  subCount: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  right: { flexDirection: "row", alignItems: "center", gap: 6 },
+  amt: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  mo: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+});
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },

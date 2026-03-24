@@ -18,6 +18,7 @@ import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
 import { TransactionItem } from "@/components/TransactionItem";
 import type { CardRewards } from "@/context/FinanceContext";
+import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
 
 const { width } = Dimensions.get("window");
 const PANEL_WIDTH = width - 40;
@@ -204,7 +205,67 @@ function BillingPanel({ cardId, balance }: { cardId: string; balance: number }) 
   );
 }
 
+// ─── Subscriptions panel ──────────────────────────────────────────────────────
+
+function SubscriptionsPanel({ cardId }: { cardId: string }) {
+  const cardColor = CARD_COLORS[cardId] || Colors.primary;
+  const subs = SUBSCRIPTIONS.filter((s) => s.cardId === cardId);
+  const total = subs.reduce((sum, s) => sum + s.amount, 0);
+
+  function formatDate(dateStr: string) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  return (
+    <View style={[styles.infoPage, { gap: 10 }]}>
+      <View style={styles.rewardsPanelHeader}>
+        <Feather name="repeat" size={16} color={cardColor} />
+        <Text style={styles.rewardsPanelTitle}>Subscriptions</Text>
+      </View>
+
+      {subs.length === 0 ? (
+        <View style={{ alignItems: "center", paddingVertical: 24 }}>
+          <Feather name="inbox" size={28} color={Colors.textMuted} />
+          <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textMuted, marginTop: 8 }}>
+            No subscriptions on this card
+          </Text>
+        </View>
+      ) : (
+        <>
+          <View style={[subPnl.totalRow, { borderColor: `${cardColor}30` }]}>
+            <Text style={subPnl.totalLabel}>Monthly Total</Text>
+            <Text style={[subPnl.totalAmt, { color: cardColor }]}>
+              ${total.toFixed(2)}<Text style={subPnl.mo}>/mo</Text>
+            </Text>
+          </View>
+          {subs.map((sub, i) => (
+            <View key={sub.id}>
+              <View style={[subPnl.row, { borderLeftColor: cardColor }]}>
+                <View style={[subPnl.iconWrap, { backgroundColor: `${cardColor}20` }]}>
+                  <Text style={subPnl.icon}>{sub.icon}</Text>
+                </View>
+                <View style={subPnl.info}>
+                  <Text style={subPnl.name}>{sub.name}</Text>
+                  <Text style={subPnl.category}>{sub.category} · {sub.cycle}</Text>
+                </View>
+                <View style={subPnl.right}>
+                  <Text style={subPnl.amount}>${sub.amount.toFixed(2)}</Text>
+                  <Text style={subPnl.nextDate}>Next {formatDate(sub.nextDate)}</Text>
+                </View>
+              </View>
+              {i < subs.length - 1 && <View style={subPnl.sep} />}
+            </View>
+          ))}
+        </>
+      )}
+    </View>
+  );
+}
+
 // ─── Horizontally scrollable info panel ──────────────────────────────────────
+
+const TAB_ICONS: Record<number, any> = { 0: "gift", 1: "calendar", 2: "repeat" };
 
 function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; cardId: string; balance: number }) {
   const [page, setPage] = useState(0);
@@ -215,12 +276,12 @@ function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; ca
     setPage(newPage);
   };
 
-  const tabs = ["Rewards & Benefits", "Billing Dates"];
+  const tabs = ["Rewards & Benefits", "Billing Dates", "Subscriptions"];
 
   return (
     <View style={styles.infoScrollWrap}>
       {/* Tab pills */}
-      <View style={styles.tabRow}>
+      <View style={[styles.tabRow, { flexWrap: "wrap" }]}>
         {tabs.map((tab, i) => (
           <Pressable
             key={tab}
@@ -231,7 +292,7 @@ function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; ca
             style={[styles.tabPill, page === i && styles.tabPillActive]}
           >
             <Feather
-              name={i === 0 ? "gift" : "calendar"}
+              name={TAB_ICONS[i]}
               size={12}
               color={page === i ? "#fff" : Colors.textMuted}
             />
@@ -253,6 +314,7 @@ function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; ca
       >
         <RewardsPanel rewards={rewards} />
         <BillingPanel cardId={cardId} balance={balance} />
+        <SubscriptionsPanel cardId={cardId} />
       </ScrollView>
 
       {/* Page dots */}
@@ -572,5 +634,79 @@ const bill = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 16,
     color: Colors.textPrimary,
+  },
+});
+
+// ─── Subscription panel styles ────────────────────────────────────────────────
+
+const subPnl = StyleSheet.create({
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+  },
+  totalLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  totalAmt: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+  },
+  mo: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderLeftWidth: 3,
+    paddingLeft: 10,
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  icon: { fontSize: 18 },
+  info: { flex: 1, gap: 2 },
+  name: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  category: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  right: { alignItems: "flex-end", gap: 2, flexShrink: 0 },
+  amount: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  nextDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  sep: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginLeft: 62,
+    marginRight: 4,
   },
 });

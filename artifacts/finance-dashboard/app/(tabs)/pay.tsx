@@ -2,9 +2,10 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
   FlatList,
   Modal,
@@ -125,6 +126,8 @@ type MiniCalendarProps = {
   month: number;
   highlightedDays?: Set<number>;
   dotMap?: Record<number, string[]>;
+  dueMap?: Record<number, string[]>;    // day → card colors (solid border)
+  closeMap?: Record<number, string[]>; // day → card colors (dashed border)
   selectedDay?: number | null;
   onDayPress?: (day: number) => void;
   onPrevMonth?: () => void;
@@ -136,6 +139,8 @@ function MiniCalendar({
   month,
   highlightedDays = new Set(),
   dotMap = {},
+  dueMap = {},
+  closeMap = {},
   selectedDay,
   onDayPress,
   onPrevMonth,
@@ -176,6 +181,14 @@ function MiniCalendar({
           const isHighlighted = day !== null && highlightedDays.has(day);
           const isSelected = day !== null && day === selectedDay;
           const dots = day !== null ? (dotMap[day] ?? []) : [];
+          const isDue = day !== null && !!dueMap[day];
+          const isClose = day !== null && !!closeMap[day];
+          const dueColor = isDue ? (dueMap[day][0] || Colors.primary) : undefined;
+          const closeColor = isClose ? (closeMap[day][0] || Colors.primary) : undefined;
+          // Payment circle: gradient if multiple colors, else solid
+          const payBg = isHighlighted && !isSelected
+            ? (dots.length > 1 ? undefined : dots[0])
+            : undefined;
 
           return (
             <View
@@ -188,14 +201,28 @@ function MiniCalendar({
                   style={({ pressed }) => [
                     cal.dayBtn,
                     isSelected && cal.dayBtnSelected,
-                    isHighlighted && !isSelected && cal.dayBtnHighlighted,
+                    isHighlighted && !isSelected && payBg
+                      ? { backgroundColor: `${payBg}55`, borderWidth: 1.5, borderColor: payBg, borderStyle: "solid" }
+                      : isHighlighted && !isSelected && dots.length > 1
+                      ? { backgroundColor: "rgba(108,158,255,0.2)", borderWidth: 1.5, borderColor: Colors.primary, borderStyle: "solid" }
+                      : isHighlighted && !isSelected
+                      ? cal.dayBtnHighlighted
+                      : null,
+                    isDue && !isHighlighted && !isSelected
+                      ? { borderWidth: 1.5, borderColor: dueColor, borderStyle: "solid" }
+                      : null,
+                    isClose && !isHighlighted && !isSelected && !isDue
+                      ? { borderWidth: 1.5, borderColor: closeColor, borderStyle: "dashed" }
+                      : null,
                     pressed && { opacity: 0.7 },
                   ]}
                 >
                   <Text style={[
                     cal.dayText,
                     isSelected && cal.dayTextSelected,
-                    isHighlighted && !isSelected && cal.dayTextHighlighted,
+                    isHighlighted && !isSelected && { color: dots[0] || Colors.primary, fontFamily: "Inter_700Bold" },
+                    isDue && !isHighlighted && !isSelected && { color: dueColor, fontFamily: "Inter_600SemiBold" },
+                    isClose && !isHighlighted && !isSelected && !isDue && { color: closeColor },
                   ]}>
                     {day}
                   </Text>
@@ -204,6 +231,13 @@ function MiniCalendar({
                       {dots.slice(0, 3).map((color, di) => (
                         <View key={di} style={[cal.dot, { backgroundColor: color }]} />
                       ))}
+                    </View>
+                  )}
+                  {/* Due or close marker when no payment */}
+                  {!isHighlighted && (isDue || isClose) && (
+                    <View style={cal.dotsRow}>
+                      {isDue && <View style={[cal.dot, { backgroundColor: dueColor }]} />}
+                      {isClose && <View style={[cal.dot, { backgroundColor: closeColor, opacity: 0.6 }]} />}
                     </View>
                   )}
                 </Pressable>
@@ -216,6 +250,22 @@ function MiniCalendar({
             </View>
           );
         })}
+      </View>
+
+      {/* Legend */}
+      <View style={cal.legend}>
+        <View style={cal.legendItem}>
+          <View style={[cal.legendDot, { backgroundColor: Colors.primary }]} />
+          <Text style={cal.legendText}>Payment</Text>
+        </View>
+        <View style={cal.legendItem}>
+          <View style={[cal.legendBorder, { borderColor: "#9B5CF5", borderStyle: "solid" }]} />
+          <Text style={cal.legendText}>Due Date</Text>
+        </View>
+        <View style={cal.legendItem}>
+          <View style={[cal.legendBorder, { borderColor: "#F59E0B", borderStyle: "dashed" }]} />
+          <Text style={cal.legendText}>Statement Close</Text>
+        </View>
       </View>
     </View>
   );
@@ -413,13 +463,36 @@ function PaymentDetailModal({ payment, onClose }: PaymentDetailModalProps) {
   );
 }
 
-// ─── Calendar Overview Modal ─────────────────────────────────────────────────
+// ─── Billing data for calendar markers ────────────────────────────────────────
+
+const BILLING_DATA: Record<string, { dueDay: number; statementClose: number }> = {
+  "card-1": { dueDay: 15, statementClose: 30 },
+  "card-2": { dueDay: 20, statementClose: 2  },
+  "card-3": { dueDay: 25, statementClose: 7  },
+};
+
+// ─── Calendar Overview Modal ───────────────────────────────────────────────────
 
 type CalendarOverviewModalProps = {
   visible: boolean;
   onClose: () => void;
   onSelectPayment: (p: ScheduledPayment) => void;
 };
+
+// Month jump picker options (18 months: 6 back + current + 11 forward)
+const CAL_MONTH_OPTIONS = (() => {
+  const now = new Date();
+  const opts: { label: string; year: number; month: number }[] = [];
+  for (let i = -6; i <= 11; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    opts.push({
+      label: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+    });
+  }
+  return opts;
+})();
 
 function CalendarOverviewModal({ visible, onClose, onSelectPayment }: CalendarOverviewModalProps) {
   const { scheduledPayments, cards } = useFinance();
@@ -430,11 +503,14 @@ function CalendarOverviewModal({ visible, onClose, onSelectPayment }: CalendarOv
 
   const cardById = Object.fromEntries(cards.map((c) => [c.id, c]));
 
-  const { dotMap, highlightedDays, paymentsOnDay } = useMemo(() => {
+  const { dotMap, highlightedDays, paymentsOnDay, dueMap, closeMap } = useMemo(() => {
     const dots: Record<number, string[]> = {};
     const highlighted = new Set<number>();
     const onDay: Record<number, ScheduledPayment[]> = {};
+    const due: Record<number, string[]> = {};
+    const close: Record<number, string[]> = {};
 
+    // Scheduled payments
     for (const sp of scheduledPayments) {
       const d = parseDate(sp.date);
       if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
@@ -446,7 +522,15 @@ function CalendarOverviewModal({ visible, onClose, onSelectPayment }: CalendarOv
         }
       }
     }
-    return { dotMap: dots, highlightedDays: highlighted, paymentsOnDay: onDay };
+
+    // Billing due dates and statement close dates
+    for (const [cardId, bd] of Object.entries(BILLING_DATA)) {
+      const color = CARD_COLORS[cardId] || Colors.primary;
+      due[bd.dueDay] = [...(due[bd.dueDay] ?? []), color];
+      close[bd.statementClose] = [...(close[bd.statementClose] ?? []), color];
+    }
+
+    return { dotMap: dots, highlightedDays: highlighted, paymentsOnDay: onDay, dueMap: due, closeMap: close };
   }, [scheduledPayments, viewYear, viewMonth]);
 
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -481,6 +565,8 @@ function CalendarOverviewModal({ visible, onClose, onSelectPayment }: CalendarOv
               month={viewMonth}
               highlightedDays={highlightedDays}
               dotMap={dotMap}
+              dueMap={dueMap}
+              closeMap={closeMap}
               selectedDay={selectedDay}
               onDayPress={(d) => {
                 Haptics.selectionAsync();
@@ -489,6 +575,27 @@ function CalendarOverviewModal({ visible, onClose, onSelectPayment }: CalendarOv
               onPrevMonth={goBack}
               onNextMonth={goNext}
             />
+
+            {/* Month jump picker */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={calOv.monthPickerRow}
+              style={{ marginBottom: 12 }}
+            >
+              {CAL_MONTH_OPTIONS.map((opt) => {
+                const active = opt.year === viewYear && opt.month === viewMonth;
+                return (
+                  <Pressable
+                    key={`${opt.year}-${opt.month}`}
+                    onPress={() => { Haptics.selectionAsync(); setViewYear(opt.year); setViewMonth(opt.month); setSelectedDay(null); }}
+                    style={[calOv.monthChip, active && calOv.monthChipActive]}
+                  >
+                    <Text style={[calOv.monthChipText, active && calOv.monthChipTextActive]}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
             {scheduledPayments.length === 0 ? (
               <View style={calOv.empty}>
@@ -1379,6 +1486,97 @@ function CryptoModal({
   );
 }
 
+// ─── Cycle picker modal (transaction mode) ───────────────────────────────────
+
+const TX_MONTHS = (() => {
+  const now = new Date();
+  const months: { label: string; year: number; month: number }[] = [];
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      label: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+    });
+  }
+  return months;
+})();
+
+function TxCyclePickerModal({
+  visible,
+  selected,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selected: { year: number; month: number } | null;
+  onSelect: (v: { year: number; month: number } | null) => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={tcp.overlay}>
+        <View style={[tcp.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={tcp.handle} />
+          <View style={tcp.header}>
+            <Text style={tcp.title}>Filter by Month</Text>
+            <Pressable onPress={onClose} style={tcp.closeBtn}>
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tcp.grid}>
+            <Pressable
+              onPress={() => { onSelect(null); onClose(); }}
+              style={[tcp.chip, selected === null && tcp.chipActive]}
+            >
+              <Text style={[tcp.chipText, selected === null && tcp.chipTextActive]}>All Time</Text>
+            </Pressable>
+            {TX_MONTHS.map((m) => {
+              const active = selected?.year === m.year && selected?.month === m.month;
+              return (
+                <Pressable
+                  key={`${m.year}-${m.month}`}
+                  onPress={() => { onSelect({ year: m.year, month: m.month }); onClose(); }}
+                  style={[tcp.chip, active && tcp.chipActive]}
+                >
+                  <Text style={[tcp.chipText, active && tcp.chipTextActive]}>{m.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const tcp = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#0E0828",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 8,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    maxHeight: "60%",
+  },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.2)", alignSelf: "center", marginBottom: 14 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  title: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.textPrimary },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 16 },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: Colors.divider,
+  },
+  chipActive: { backgroundColor: "rgba(108,158,255,0.2)", borderColor: "rgba(108,158,255,0.5)" },
+  chipText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary },
+  chipTextActive: { color: Colors.primary, fontFamily: "Inter_600SemiBold" },
+});
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function PayScreen() {
@@ -1389,18 +1587,39 @@ export default function PayScreen() {
   const [calendarVisible, setCalendarVisible]   = useState(false);
   const [cryptoVisible, setCryptoVisible]       = useState(false);
   const [selectedPayment, setSelectedPayment]   = useState<ScheduledPayment | null>(null);
+  const [txMode, setTxMode]                     = useState(false);
+  const [txCycleVisible, setTxCycleVisible]     = useState(false);
+  const [txCycle, setTxCycle]                   = useState<{ year: number; month: number } | null>(null);
 
-  const filtered = transactions
-    .filter((t) => {
-      if (filter === "All") return true;
-      if (filter === "Debit") return t.type === "debit";
-      return t.type === "credit";
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Scroll tracking
+  const listRef = useRef<FlatList<any>>(null);
+  const scrollYRef = useRef(0);
+  const contentHRef = useRef(0);
+  const listHRef = useRef(0);
+  const headerHRef = useRef(0);
+  const thumbAnim = useRef(new Animated.Value(0)).current;
+  const thumbTopAnim = useRef(new Animated.Value(0)).current;
+  const thumbHAnim = useRef(new Animated.Value(40)).current;
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const cardById = Object.fromEntries(cards.map((c) => [c.id, c]));
-  const totalDebit   = transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0);
-  const totalCredit  = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
+  const filtered = useMemo(() => {
+    return transactions
+      .filter((t) => {
+        if (filter === "Debit") return t.type === "debit";
+        if (filter === "Credit") return t.type === "credit";
+        return true;
+      })
+      .filter((t) => {
+        if (!txCycle) return true;
+        const d = new Date(t.date);
+        return d.getFullYear() === txCycle.year && d.getMonth() === txCycle.month;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, filter, txCycle]);
+
+  const cardById = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
+  const totalDebit  = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0), [transactions]);
+  const totalCredit = useMemo(() => transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0), [transactions]);
 
   const handlePayAll = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1411,104 +1630,55 @@ export default function PayScreen() {
     );
   };
 
+  const updateScrollbar = useCallback((y: number) => {
+    const total = contentHRef.current;
+    const visible = listHRef.current;
+    if (total <= visible) return;
+    const h = Math.max(32, (visible / total) * visible);
+    const maxTop = visible - h;
+    const top = (y / (total - visible)) * maxTop;
+    thumbHAnim.setValue(h);
+    thumbTopAnim.setValue(Math.max(0, Math.min(top, maxTop)));
+  }, [thumbHAnim, thumbTopAnim]);
+
+  const showScrollbar = useCallback(() => {
+    Animated.timing(thumbAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      Animated.timing(thumbAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+    }, 1500);
+  }, [thumbAnim]);
+
+  const handleScroll = useCallback((e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    scrollYRef.current = y;
+    const threshold = headerHRef.current > 0 ? headerHRef.current - 80 : 420;
+    setTxMode(y > threshold);
+    updateScrollbar(y);
+    showScrollbar();
+  }, [updateScrollbar, showScrollbar]);
+
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const txCycleLabel = txCycle
+    ? new Date(txCycle.year, txCycle.month, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    : "All";
+
   return (
     <LinearGradient colors={[Colors.backgroundGradientStart, Colors.backgroundGradientEnd]} style={styles.gradient}>
 
-      {/* ── Fixed header section ── */}
-      <View style={[styles.fixedTop, { paddingTop: insets.top + 12 }]}>
-
-        {/* Title row */}
-        <View style={styles.pageHeader}>
-          <View>
-            <Text style={styles.pageTitle}>Pay</Text>
-            <Text style={styles.pageSubtitle}>Manage & schedule payments</Text>
-          </View>
-          <View style={styles.headerBtns}>
-            <Pressable
-              onPress={() => { Haptics.selectionAsync(); setCalendarVisible(true); }}
-              style={({ pressed }) => [styles.calBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Feather name="calendar" size={19} color={Colors.primary} />
-            </Pressable>
-            <Pressable
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.75 }]}
-            >
-              <Feather name="plus" size={26} color="#fff" />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Summary */}
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Money In</Text>
-            <Text style={[styles.summaryAmt, { color: Colors.positive }]}>+{formatCurrency(totalCredit)}</Text>
-          </View>
-          <View style={styles.summaryDiv} />
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Money Out</Text>
-            <Text style={[styles.summaryAmt, { color: Colors.negative }]}>-{formatCurrency(totalDebit)}</Text>
-          </View>
-        </View>
-
-        {/* Scheduled payments */}
-        {scheduledPayments.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Scheduled Payments</Text>
-            {scheduledPayments.map((sp) => {
-              const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
-              return (
-                <View key={sp.id} style={styles.scheduledCard}>
-                  <View style={styles.scheduledTop}>
-                    <Pressable
-                      onPress={() => { Haptics.selectionAsync(); setSelectedPayment(sp); }}
-                      style={({ pressed }) => [styles.datePill, pressed && { opacity: 0.75 }]}
-                    >
-                      <Feather name="calendar" size={13} color={Colors.primary} />
-                      <Text style={styles.datePillText}>{formatDateDisplay(sp.date)}</Text>
-                      <View style={styles.datePillChevron}>
-                        <Feather name="chevron-right" size={11} color={Colors.primary} />
-                      </View>
-                    </Pressable>
-                    <View style={[styles.statusBadge, { backgroundColor: sp.status === "pending" ? "rgba(108,158,255,0.15)" : "rgba(74,222,170,0.15)" }]}>
-                      <Text style={[styles.statusText, { color: sp.status === "pending" ? Colors.primary : Colors.positive }]}>
-                        {sp.status === "pending" ? "Pending" : "Completed"}
-                      </Text>
-                    </View>
-                  </View>
-                  {sp.note ? <Text style={styles.scheduledNote}>{sp.note}</Text> : null}
-                  <View style={styles.scheduledCards}>
-                    {sp.cardIds.map((cid) => {
-                      const c = cardById[cid];
-                      if (!c) return null;
-                      return (
-                        <View key={cid} style={styles.scheduledCardRow}>
-                          <View style={[styles.cardDot, { backgroundColor: CARD_COLORS[cid] || Colors.primary }]} />
-                          <Text style={styles.scheduledCardName}>{c.name} ···{c.lastFour}</Text>
-                          <Text style={styles.scheduledAmt}>{formatCurrency(sp.amounts[cid] || 0)}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                  <View style={styles.scheduledTotalRow}>
-                    <Text style={styles.scheduledTotalLabel}>Total</Text>
-                    <Text style={styles.scheduledTotalValue}>{formatCurrency(totalAmt)}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </>
-        )}
-
-      </View>
-
-      {/* ── Scrollable section: action icons + transactions ── */}
+      {/* ── Full-page FlatList — everything scrolls ── */}
       <FlatList
+        ref={listRef}
         data={filtered}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        style={styles.txList}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onContentSizeChange={(_, h) => { contentHRef.current = h; }}
+        onLayout={(e) => { listHRef.current = e.nativeEvent.layout.height; }}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
@@ -1522,6 +1692,96 @@ export default function PayScreen() {
         )}
         ListHeaderComponent={() => (
           <>
+            {/* ── Page header ── */}
+            <View
+              style={[styles.pageHeaderWrap, { paddingTop: insets.top + 12 }]}
+              onLayout={(e) => { headerHRef.current = e.nativeEvent.layout.height; }}
+            >
+              {/* Title row */}
+              <View style={styles.pageHeader}>
+                <View>
+                  <Text style={styles.pageTitle}>Pay</Text>
+                  <Text style={styles.pageSubtitle}>Manage & schedule payments</Text>
+                </View>
+                <View style={styles.headerBtns}>
+                  <Pressable
+                    onPress={() => { Haptics.selectionAsync(); setCalendarVisible(true); }}
+                    style={({ pressed }) => [styles.calBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Feather name="calendar" size={19} color={Colors.primary} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
+                    style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.75 }]}
+                  >
+                    <Feather name="plus" size={26} color="#fff" />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Summary */}
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryLabel}>Money In</Text>
+                  <Text style={[styles.summaryAmt, { color: Colors.positive }]}>+{formatCurrency(totalCredit)}</Text>
+                </View>
+                <View style={styles.summaryDiv} />
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryLabel}>Money Out</Text>
+                  <Text style={[styles.summaryAmt, { color: Colors.negative }]}>-{formatCurrency(totalDebit)}</Text>
+                </View>
+              </View>
+
+              {/* Scheduled payments */}
+              {scheduledPayments.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>Scheduled Payments</Text>
+                  {scheduledPayments.map((sp) => {
+                    const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
+                    return (
+                      <View key={sp.id} style={styles.scheduledCard}>
+                        <View style={styles.scheduledTop}>
+                          <Pressable
+                            onPress={() => { Haptics.selectionAsync(); setSelectedPayment(sp); }}
+                            style={({ pressed }) => [styles.datePill, pressed && { opacity: 0.75 }]}
+                          >
+                            <Feather name="calendar" size={13} color={Colors.primary} />
+                            <Text style={styles.datePillText}>{formatDateDisplay(sp.date)}</Text>
+                            <View style={styles.datePillChevron}>
+                              <Feather name="chevron-right" size={11} color={Colors.primary} />
+                            </View>
+                          </Pressable>
+                          <View style={[styles.statusBadge, { backgroundColor: sp.status === "pending" ? "rgba(108,158,255,0.15)" : "rgba(74,222,170,0.15)" }]}>
+                            <Text style={[styles.statusText, { color: sp.status === "pending" ? Colors.primary : Colors.positive }]}>
+                              {sp.status === "pending" ? "Pending" : "Completed"}
+                            </Text>
+                          </View>
+                        </View>
+                        {sp.note ? <Text style={styles.scheduledNote}>{sp.note}</Text> : null}
+                        <View style={styles.scheduledCards}>
+                          {sp.cardIds.map((cid) => {
+                            const c = cardById[cid];
+                            if (!c) return null;
+                            return (
+                              <View key={cid} style={styles.scheduledCardRow}>
+                                <View style={[styles.cardDot, { backgroundColor: CARD_COLORS[cid] || Colors.primary }]} />
+                                <Text style={styles.scheduledCardName}>{c.name} ···{c.lastFour}</Text>
+                                <Text style={styles.scheduledAmt}>{formatCurrency(sp.amounts[cid] || 0)}</Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                        <View style={styles.scheduledTotalRow}>
+                          <Text style={styles.scheduledTotalLabel}>Total</Text>
+                          <Text style={styles.scheduledTotalValue}>{formatCurrency(totalAmt)}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+            </View>
+
             {/* ── Action icon buttons: Pay | Crypto ── */}
             <View style={styles.actionIconsRow}>
               <Pressable
@@ -1597,6 +1857,46 @@ export default function PayScreen() {
         )}
       />
 
+      {/* ── Custom thin scrollbar ── */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.scrollTrack,
+          { top: insets.top, bottom: insets.bottom + 80, opacity: thumbAnim },
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.scrollThumb,
+            {
+              height: thumbHAnim,
+              transform: [{ translateY: thumbTopAnim }],
+            },
+          ]}
+        />
+      </Animated.View>
+
+      {/* ── Transaction mode overlay header ── */}
+      {txMode && (
+        <View style={[styles.txOverlay, { paddingTop: insets.top }]}>
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); scrollToTop(); }}
+            style={({ pressed }) => [styles.txBackBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Feather name="chevron-left" size={20} color={Colors.textPrimary} />
+            <Text style={styles.txBackText}>Back</Text>
+          </Pressable>
+          <Text style={styles.txOverlayTitle}>Transaction History</Text>
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); setTxCycleVisible(true); }}
+            style={({ pressed }) => [styles.txCycleBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Feather name="calendar" size={14} color={Colors.primary} />
+            <Text style={styles.txCycleBtnText}>{txCycleLabel}</Text>
+          </Pressable>
+        </View>
+      )}
+
       <ScheduleModal visible={scheduleVisible} onClose={() => setScheduleVisible(false)} />
       <CalendarOverviewModal
         visible={calendarVisible}
@@ -1610,6 +1910,12 @@ export default function PayScreen() {
       <CryptoModal
         visible={cryptoVisible}
         onClose={() => setCryptoVisible(false)}
+      />
+      <TxCyclePickerModal
+        visible={txCycleVisible}
+        selected={txCycle}
+        onSelect={setTxCycle}
+        onClose={() => setTxCycleVisible(false)}
       />
     </LinearGradient>
   );
@@ -1872,12 +2178,74 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.8)",
   },
 
-  // New layout styles
-  fixedTop: {
+  // Page header wrapper (has onLayout for threshold detection)
+  pageHeaderWrap: {
     paddingBottom: 4,
   },
-  txList: {
+
+  // Custom thin scrollbar
+  scrollTrack: {
+    position: "absolute",
+    right: 3,
+    width: 3,
+    borderRadius: 1.5,
+    overflow: "hidden",
+  },
+  scrollThumb: {
+    width: 3,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.28)",
+  },
+
+  // Transaction mode overlay header
+  txOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    backgroundColor: "rgba(13,8,35,0.92)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  txBackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 6,
+    paddingRight: 12,
+  },
+  txBackText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  txOverlayTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.textPrimary,
     flex: 1,
+    textAlign: "center",
+  },
+  txCycleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(108,158,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(108,158,255,0.3)",
+  },
+  txCycleBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.primary,
   },
   actionIconsRow: {
     flexDirection: "row",
@@ -2054,6 +2422,39 @@ const cal = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  legend: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 14,
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    marginTop: 4,
+    marginHorizontal: 8,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  legendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  legendBorder: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    backgroundColor: "transparent",
+  },
+  legendText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textMuted,
   },
 });
 
@@ -2425,6 +2826,32 @@ const calOv = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  monthPickerRow: {
+    paddingHorizontal: 4,
+    gap: 6,
+    paddingVertical: 4,
+  },
+  monthChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  monthChipActive: {
+    backgroundColor: "rgba(108,158,255,0.2)",
+    borderColor: Colors.primary,
+  },
+  monthChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  monthChipTextActive: {
+    color: Colors.primary,
+    fontFamily: "Inter_600SemiBold",
   },
 });
 
