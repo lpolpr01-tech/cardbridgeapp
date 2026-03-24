@@ -152,12 +152,187 @@ function AddBankModal({ visible, onClose }: { visible: boolean; onClose: () => v
   );
 }
 
+// ─── Personal Info Modal ──────────────────────────────────────────────────────
+
+type PersonalInfo = {
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  newsletter: boolean;
+};
+
+function PersonalInfoModal({
+  visible,
+  info,
+  onSave,
+  onClose,
+}: {
+  visible: boolean;
+  info: PersonalInfo;
+  onSave: (i: PersonalInfo) => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [firstName, setFirstName] = useState(info.firstName);
+  const [middleName, setMiddleName] = useState(info.middleName);
+  const [lastName, setLastName] = useState(info.lastName);
+  const [phone, setPhone] = useState(info.phone);
+  const [email, setEmail] = useState(info.email);
+  const [newsletter, setNewsletter] = useState(info.newsletter);
+
+  // Sync when outer info changes (e.g. modal re-opened)
+  React.useEffect(() => {
+    if (visible) {
+      setFirstName(info.firstName);
+      setMiddleName(info.middleName);
+      setLastName(info.lastName);
+      setPhone(info.phone);
+      setEmail(info.email);
+      setNewsletter(info.newsletter);
+    }
+  }, [visible]);
+
+  const handleSave = () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      Alert.alert("Required", "First name and last name are required.");
+      return;
+    }
+    onSave({ firstName: firstName.trim(), middleName: middleName.trim(), lastName: lastName.trim(), phone: phone.trim(), email: email.trim(), newsletter });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={piModal.overlay}>
+        <View style={[piModal.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={piModal.handle} />
+          <View style={piModal.header}>
+            <Text style={piModal.title}>Personal Info</Text>
+            <Pressable onPress={onClose} style={piModal.closeBtn}>
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Name fields */}
+            <Text style={piModal.fieldLabel}>First Name</Text>
+            <TextInput
+              style={piModal.input}
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First name"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="words"
+            />
+
+            <Text style={piModal.fieldLabel}>Middle Name</Text>
+            <TextInput
+              style={piModal.input}
+              value={middleName}
+              onChangeText={setMiddleName}
+              placeholder="Middle name (optional)"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="words"
+            />
+
+            <Text style={piModal.fieldLabel}>Last Name</Text>
+            <TextInput
+              style={piModal.input}
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Last name"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="words"
+            />
+
+            <View style={piModal.divider} />
+
+            {/* Phone */}
+            <Text style={piModal.fieldLabel}>Phone Number</Text>
+            <TextInput
+              style={piModal.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+1 (555) 000-0000"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="phone-pad"
+            />
+
+            {/* Email */}
+            <Text style={piModal.fieldLabel}>Email Address</Text>
+            <TextInput
+              style={piModal.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <View style={piModal.divider} />
+
+            {/* Newsletter toggle */}
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); setNewsletter((n) => !n); }}
+              style={piModal.newsletterRow}
+            >
+              <View style={piModal.newsletterCheck}>
+                {newsletter ? (
+                  <View style={piModal.checkFilled}>
+                    <Feather name="check" size={13} color="#fff" />
+                  </View>
+                ) : (
+                  <View style={piModal.checkEmpty} />
+                )}
+              </View>
+              <View style={piModal.newsletterInfo}>
+                <Text style={piModal.newsletterLabel}>Receive newsletter & promotions</Text>
+                <Text style={piModal.newsletterSub}>Stay updated with offers and insights via email</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={handleSave}
+              style={({ pressed }) => [piModal.saveBtn, pressed && { opacity: 0.8 }]}
+            >
+              <Feather name="check" size={16} color="#fff" />
+              <Text style={piModal.saveBtnText}>Save Changes</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function OptionsScreen() {
   const insets = useSafeAreaInsets();
   const { totalBalance, cards, transactions, bankAccounts } = useFinance();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [biometricEnabled, setBiometricEnabled] = React.useState(false);
   const [addBankVisible, setAddBankVisible] = useState(false);
+
+  const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
+    firstName: "Alex",
+    middleName: "",
+    lastName: "Johnson",
+    phone: "",
+    email: "alex.johnson@email.com",
+    newsletter: false,
+  });
+  const [personalInfoVisible, setPersonalInfoVisible] = useState(false);
+
+  const displayName = [personalInfo.firstName, personalInfo.middleName, personalInfo.lastName]
+    .filter(Boolean)
+    .join(" ");
+  const initials = [personalInfo.firstName[0], personalInfo.lastName[0]]
+    .filter(Boolean)
+    .join("")
+    .toUpperCase();
 
   const totalCredit = transactions
     .filter((t) => t.type === "credit")
@@ -178,11 +353,11 @@ export default function OptionsScreen() {
       >
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>AJ</Text>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Alex Johnson</Text>
-            <Text style={styles.profileEmail}>alex.johnson@email.com</Text>
+            <Text style={styles.profileName}>{displayName}</Text>
+            <Text style={styles.profileEmail}>{personalInfo.email || "No email set"}</Text>
           </View>
           <View style={[styles.premiumBadge]}>
             <Text style={styles.premiumText}>Premium</Text>
@@ -213,8 +388,8 @@ export default function OptionsScreen() {
           <SettingRow
             icon="user"
             label="Personal Info"
-            subtitle="Update your profile"
-            onPress={() => {}}
+            subtitle={displayName}
+            onPress={() => setPersonalInfoVisible(true)}
           />
           <View style={styles.rowDivider} />
           <SettingRow
@@ -339,6 +514,12 @@ export default function OptionsScreen() {
       </ScrollView>
 
       <AddBankModal visible={addBankVisible} onClose={() => setAddBankVisible(false)} />
+      <PersonalInfoModal
+        visible={personalInfoVisible}
+        info={personalInfo}
+        onSave={setPersonalInfo}
+        onClose={() => setPersonalInfoVisible(false)}
+      />
     </LinearGradient>
   );
 }
@@ -641,6 +822,136 @@ const bankModal = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
     textAlign: "center",
+  },
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.primaryDark,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  saveBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
+  },
+});
+
+const piModal = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#1C1048",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "92%",
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.divider,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.textPrimary,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fieldLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  input: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginVertical: 12,
+  },
+  newsletterRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    padding: 14,
+    marginBottom: 20,
+  },
+  newsletterCheck: {
+    paddingTop: 1,
+  },
+  checkFilled: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: Colors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+  checkEmpty: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.textMuted,
+    backgroundColor: "transparent",
+  },
+  newsletterInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  newsletterLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  newsletterSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
   },
   saveBtn: {
     flexDirection: "row",
