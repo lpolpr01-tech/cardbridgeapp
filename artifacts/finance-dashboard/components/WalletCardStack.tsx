@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,8 +20,10 @@ import { useFinance } from "@/context/FinanceContext";
 import {
   useTheme,
   THEMES,
+  PASTEL_THEMES,
   PATTERNS,
   CARD_STYLES,
+  customColorToGradient,
   type CardStyle,
   type PatternName,
   type ThemeName,
@@ -197,14 +200,213 @@ function BackgroundPattern({ pattern }: { pattern: PatternName }) {
     );
   }
 
+  if (pattern === "diamonds") {
+    const SIZE = 26;
+    return (
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
+        {Array.from({ length: rows }).map((_, r) =>
+          Array.from({ length: cols }).map((_, c) => (
+            <View
+              key={`${r}-${c}`}
+              style={{
+                position: "absolute",
+                left: c * SIZE + (r % 2 === 0 ? 0 : SIZE / 2) - SIZE / 2,
+                top: r * SIZE - SIZE / 2,
+                width: SIZE * 0.55,
+                height: SIZE * 0.55,
+                borderWidth: 0.6,
+                borderColor: "rgba(255,255,255,0.06)",
+                transform: [{ rotate: "45deg" }],
+              }}
+            />
+          ))
+        )}
+      </View>
+    );
+  }
+
+  if (pattern === "hexagon") {
+    const HEX_W = 32;
+    const HEX_H = 28;
+    return (
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
+        {Array.from({ length: rows }).map((_, r) =>
+          Array.from({ length: cols }).map((_, c) => (
+            <View
+              key={`${r}-${c}`}
+              style={{
+                position: "absolute",
+                left: c * HEX_W + (r % 2 === 0 ? 0 : HEX_W / 2),
+                top: r * HEX_H * 0.75,
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: "rgba(255,255,255,0.055)",
+              }}
+            />
+          ))
+        )}
+      </View>
+    );
+  }
+
+  if (pattern === "baroque") {
+    return (
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
+        {Array.from({ length: 18 }).map((_, r) => (
+          <View
+            key={`d${r}`}
+            style={{
+              position: "absolute",
+              left: -width * 0.5,
+              right: -width * 0.5,
+              top: r * 55,
+              height: 0.8,
+              backgroundColor: "rgba(180,130,255,0.05)",
+              transform: [{ rotate: `${r % 2 === 0 ? 22 : -22}deg` }],
+            }}
+          />
+        ))}
+        {Array.from({ length: 8 }).map((_, r) =>
+          Array.from({ length: 5 }).map((_, c) => (
+            <View
+              key={`o${r}-${c}`}
+              style={{
+                position: "absolute",
+                left: c * 90 + (r % 2 === 0 ? 0 : 45) - 16,
+                top: r * 80 - 16,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                borderWidth: 0.5,
+                borderColor: "rgba(180,130,255,0.07)",
+              }}
+            />
+          ))
+        )}
+      </View>
+    );
+  }
+
+  if (pattern === "art-deco") {
+    const FAN_COUNT = 7;
+    return (
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
+        {Array.from({ length: 5 }).map((_, col) =>
+          Array.from({ length: FAN_COUNT }).map((_, r) => {
+            const angle = -90 + (r / (FAN_COUNT - 1)) * 180;
+            return (
+              <View
+                key={`f${col}-${r}`}
+                style={{
+                  position: "absolute",
+                  left: col * (width / 4) - 1,
+                  top: -10,
+                  width: 1,
+                  height: 250,
+                  backgroundColor: "rgba(255,255,255,0.035)",
+                  transformOrigin: "50% 0%",
+                  transform: [{ rotate: `${angle}deg` }],
+                }}
+              />
+            );
+          })
+        )}
+        {Array.from({ length: 8 }).map((_, r) => (
+          <View
+            key={`l${r}`}
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: r * 110,
+              height: 0.7,
+              backgroundColor: "rgba(255,215,0,0.04)",
+            }}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  if (pattern === "zigzag") {
+    return (
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
+        {Array.from({ length: rows * 2 }).map((_, r) => (
+          <View
+            key={r}
+            style={{
+              position: "absolute",
+              left: -width,
+              right: -width,
+              top: r * 14,
+              height: 1,
+              backgroundColor: "rgba(255,255,255,0.04)",
+              transform: [{ rotate: `${r % 2 === 0 ? 12 : -12}deg` }],
+            }}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  if (pattern === "chevron") {
+    return (
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" } as any]}>
+        {Array.from({ length: rows }).map((_, r) => (
+          <View key={r} style={{ position: "absolute", left: 0, right: 0, top: r * 22, flexDirection: "row" }}>
+            {Array.from({ length: Math.ceil(width / 20) + 1 }).map((_, c) => (
+              <View
+                key={c}
+                style={{
+                  width: 20,
+                  height: 1,
+                  backgroundColor: "rgba(255,255,255,0.045)",
+                  transform: [{ rotate: `${c % 2 === 0 ? 30 : -30}deg` }],
+                }}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  }
+
   return null;
 }
 
+// ─── Rainbow presets for custom color picker ─────────────────────────────────
+
+const RAINBOW_PRESETS = [
+  "#FF6B6B", "#FF8C42", "#FFD700", "#A3E635", "#4ADEAA",
+  "#22D3EE", "#6C9EFF", "#8B5CF6", "#EC4899", "#F43F5E",
+  "#FB923C", "#34D399", "#38BDF8", "#818CF8", "#E879F9",
+  "#FCD34D", "#6EE7B7", "#7DD3FC", "#C4B5FD", "#F9A8D4",
+];
+
 // ─── Theme Modal ──────────────────────────────────────────────────────────────
 
+type ThemeTab = "pastel" | "pattern" | "custom";
+
 function ThemeModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { theme, cardStyle, pattern, setTheme, setCardStyle, setPattern } = useTheme();
+  const { theme, cardStyle, pattern, customColor, setTheme, setCardStyle, setPattern, setCustomColor } = useTheme();
   const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<ThemeTab>("pastel");
+  const [hexInput, setHexInput] = useState(customColor || "");
+
+  const applyCustomColor = (hex: string) => {
+    const clean = hex.trim().replace(/^#/, "");
+    if (clean.length === 6 && /^[0-9a-fA-F]{6}$/.test(clean)) {
+      setCustomColor(`#${clean}`);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const TABS: { id: ThemeTab; label: string; icon: string }[] = [
+    { id: "pastel", label: "Pastel", icon: "droplet" },
+    { id: "pattern", label: "Pattern", icon: "grid" },
+    { id: "custom", label: "Custom", icon: "sliders" },
+  ];
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -218,90 +420,219 @@ function ThemeModal({ visible, onClose }: { visible: boolean; onClose: () => voi
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Background Color */}
-            <Text style={tm.sectionLabel}>Background Color</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tm.swatchRow}>
-              {THEMES.map((t) => (
-                <Pressable
-                  key={t.name}
-                  onPress={() => { Haptics.selectionAsync(); setTheme(t.name); }}
-                  style={[tm.swatchWrap, theme.name === t.name && tm.swatchWrapActive]}
-                >
-                  <LinearGradient colors={t.preview} style={tm.swatch} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
-                  <Text style={tm.swatchLabel}>{t.label}</Text>
-                  {theme.name === t.name && (
-                    <View style={tm.swatchCheck}>
-                      <Feather name="check" size={10} color="#fff" />
-                    </View>
-                  )}
-                </Pressable>
-              ))}
-            </ScrollView>
+          {/* Tab switcher */}
+          <View style={tm.tabRow}>
+            {TABS.map((tab) => (
+              <Pressable
+                key={tab.id}
+                onPress={() => { Haptics.selectionAsync(); setActiveTab(tab.id); }}
+                style={[tm.tabBtn, activeTab === tab.id && tm.tabBtnActive]}
+              >
+                <Feather name={tab.icon as any} size={13} color={activeTab === tab.id ? "#fff" : Colors.textMuted} />
+                <Text style={[tm.tabLabel, activeTab === tab.id && tm.tabLabelActive]}>{tab.label}</Text>
+              </Pressable>
+            ))}
+          </View>
 
-            {/* Pattern */}
-            <Text style={tm.sectionLabel}>Background Pattern</Text>
-            <View style={tm.patternRow}>
-              {PATTERNS.map((p) => (
-                <Pressable
-                  key={p.name}
-                  onPress={() => { Haptics.selectionAsync(); setPattern(p.name); }}
-                  style={[tm.patternBtn, pattern === p.name && tm.patternBtnActive]}
-                >
-                  <Text style={[tm.patternText, pattern === p.name && tm.patternTextActive]}>
-                    {p.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4 }}>
 
-            {/* Card Style */}
-            <Text style={tm.sectionLabel}>Card Style</Text>
-            <View style={tm.cardStyleRow}>
-              {CARD_STYLES.map((s) => (
-                <Pressable
-                  key={s.value}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCardStyle(s.value); }}
-                  style={[tm.cardStyleBtn, cardStyle === s.value && tm.cardStyleBtnActive]}
-                >
-                  <Feather name={s.icon} size={20} color={cardStyle === s.value ? "#fff" : Colors.textMuted} />
-                  <Text style={[tm.cardStyleLabel, cardStyle === s.value && tm.cardStyleLabelActive]}>
-                    {s.label}
-                  </Text>
-                  {cardStyle === s.value && (
-                    <View style={tm.cardStyleCheck}>
-                      <Feather name="check-circle" size={14} color={Colors.positive} />
-                    </View>
-                  )}
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Card Color (gradient mode only) */}
-            {cardStyle === "gradient" && (
+            {/* ── PASTEL TAB ── */}
+            {activeTab === "pastel" && (
               <>
-                <Text style={tm.sectionLabel}>Card Colors</Text>
-                <View style={tm.cardColorRow}>
-                  {Object.entries(CARD_GRADIENTS).map(([id, grad]) => (
-                    <LinearGradient key={id} colors={grad} style={tm.cardColorPreview} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                      <View style={tm.cardColorInner} />
-                    </LinearGradient>
+                <Text style={tm.sectionLabel}>Classic Themes</Text>
+                <View style={tm.swatchGrid}>
+                  {THEMES.map((t) => (
+                    <Pressable
+                      key={t.name}
+                      onPress={() => { Haptics.selectionAsync(); setTheme(t.name); }}
+                      style={[tm.swatchWrap2, theme.name === t.name && !customColor && tm.swatchWrapActive]}
+                    >
+                      <LinearGradient colors={t.preview} style={tm.swatch2} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+                      <Text style={tm.swatchLabel2}>{t.label}</Text>
+                      {theme.name === t.name && !customColor && (
+                        <View style={tm.swatchCheck}>
+                          <Feather name="check" size={9} color="#fff" />
+                        </View>
+                      )}
+                    </Pressable>
                   ))}
                 </View>
-                <Text style={tm.cardColorNote}>Card colors are applied per card automatically</Text>
+
+                <Text style={tm.sectionLabel}>Pastel & Soft Luxury</Text>
+                <View style={tm.swatchGrid}>
+                  {PASTEL_THEMES.map((t) => (
+                    <Pressable
+                      key={t.name}
+                      onPress={() => { Haptics.selectionAsync(); setTheme(t.name); }}
+                      style={[tm.swatchWrap2, theme.name === t.name && !customColor && tm.swatchWrapActive]}
+                    >
+                      <LinearGradient colors={t.preview} style={tm.swatch2} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+                      <Text style={tm.swatchLabel2}>{t.label}</Text>
+                      {theme.name === t.name && !customColor && (
+                        <View style={tm.swatchCheck}>
+                          <Feather name="check" size={9} color="#fff" />
+                        </View>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Card Style in pastel tab */}
+                <Text style={tm.sectionLabel}>Card Style</Text>
+                <View style={tm.cardStyleRow}>
+                  {CARD_STYLES.map((s) => (
+                    <Pressable
+                      key={s.value}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCardStyle(s.value); }}
+                      style={[tm.cardStyleBtn, cardStyle === s.value && tm.cardStyleBtnActive]}
+                    >
+                      <Feather name={s.icon} size={18} color={cardStyle === s.value ? "#fff" : Colors.textMuted} />
+                      <Text style={[tm.cardStyleLabel, cardStyle === s.value && tm.cardStyleLabelActive]}>{s.label}</Text>
+                      {cardStyle === s.value && (
+                        <View style={tm.cardStyleCheck}>
+                          <Feather name="check-circle" size={13} color={Colors.positive} />
+                        </View>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               </>
             )}
 
-            {cardStyle === "classic" && (
-              <View style={tm.classicPreview}>
-                <LinearGradient colors={["#1a1a2e", "#2a2a4e"]} style={tm.classicPreviewCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <ClassicChip />
-                  <Text style={tm.classicPreviewText}>VISA</Text>
-                  <Text style={tm.classicPreviewNum}>•••• •••• •••• 4821</Text>
-                </LinearGradient>
-                <Text style={tm.cardColorNote}>Premium dark card for all cards</Text>
-              </View>
+            {/* ── PATTERN TAB ── */}
+            {activeTab === "pattern" && (
+              <>
+                <Text style={tm.sectionLabel}>Background Pattern</Text>
+                <View style={tm.patternGrid}>
+                  {PATTERNS.map((p) => (
+                    <Pressable
+                      key={p.name}
+                      onPress={() => { Haptics.selectionAsync(); setPattern(p.name); }}
+                      style={[tm.patternCard, pattern === p.name && tm.patternCardActive]}
+                    >
+                      <View style={tm.patternIconArea}>
+                        {p.name === "none" && <Feather name="slash" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "dots" && <Feather name="more-horizontal" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "grid" && <Feather name="grid" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "lines" && <Feather name="minus" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "diamonds" && <Feather name="triangle" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "hexagon" && <Feather name="hexagon" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "baroque" && <Feather name="feather" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "art-deco" && <Feather name="sun" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "zigzag" && <Feather name="zap" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                        {p.name === "chevron" && <Feather name="chevrons-up" size={18} color={pattern === p.name ? "#fff" : Colors.textMuted} />}
+                      </View>
+                      <Text style={[tm.patternCardLabel, pattern === p.name && tm.patternCardLabelActive]}>{p.label}</Text>
+                      {pattern === p.name && (
+                        <View style={tm.patternCheck}>
+                          <Feather name="check" size={8} color={Colors.positive} />
+                        </View>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+
+                {cardStyle === "gradient" && (
+                  <>
+                    <Text style={tm.sectionLabel}>Card Colors</Text>
+                    <View style={tm.cardColorRow}>
+                      {Object.entries(CARD_GRADIENTS).map(([id, grad]) => (
+                        <LinearGradient key={id} colors={grad} style={tm.cardColorPreview} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                          <View style={tm.cardColorInner} />
+                        </LinearGradient>
+                      ))}
+                    </View>
+                    <Text style={tm.cardColorNote}>Card colors are applied per card automatically</Text>
+                  </>
+                )}
+                {cardStyle === "classic" && (
+                  <View style={tm.classicPreview}>
+                    <LinearGradient colors={["#1a1a2e", "#2a2a4e"]} style={tm.classicPreviewCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                      <ClassicChip />
+                      <Text style={tm.classicPreviewText}>VISA</Text>
+                      <Text style={tm.classicPreviewNum}>•••• •••• •••• 4821</Text>
+                    </LinearGradient>
+                    <Text style={tm.cardColorNote}>Premium dark card for all cards</Text>
+                  </View>
+                )}
+              </>
             )}
+
+            {/* ── CUSTOM TAB ── */}
+            {activeTab === "custom" && (
+              <>
+                <Text style={tm.sectionLabel}>Rainbow Color Presets</Text>
+                <View style={tm.rainbowGrid}>
+                  {RAINBOW_PRESETS.map((hex) => {
+                    const grad = customColorToGradient(hex);
+                    const isActive = customColor === hex;
+                    return (
+                      <Pressable
+                        key={hex}
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          setCustomColor(hex);
+                          setHexInput(hex.slice(1));
+                        }}
+                        style={[tm.rainbowSwatch, isActive && tm.rainbowSwatchActive]}
+                      >
+                        <LinearGradient colors={[hex, grad[0]]} style={tm.rainbowSwatchGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+                        {isActive && (
+                          <View style={tm.rainbowCheck}>
+                            <Feather name="check" size={9} color="#fff" />
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={tm.sectionLabel}>Custom Hex Color</Text>
+                <View style={tm.hexRow}>
+                  <View style={[tm.hexPreview, { backgroundColor: customColor || "#1A103F" }]} />
+                  <View style={tm.hexInputWrap}>
+                    <Text style={tm.hexHash}>#</Text>
+                    <TextInput
+                      style={tm.hexInput}
+                      value={hexInput}
+                      onChangeText={setHexInput}
+                      placeholder="6C9EFF"
+                      placeholderTextColor={Colors.textMuted}
+                      maxLength={6}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                  <Pressable
+                    onPress={() => applyCustomColor(hexInput)}
+                    style={({ pressed }) => [tm.hexApplyBtn, pressed && { opacity: 0.8 }]}
+                  >
+                    <Text style={tm.hexApplyText}>Apply</Text>
+                  </Pressable>
+                </View>
+                {customColor && (
+                  <View style={tm.customPreviewRow}>
+                    <LinearGradient
+                      colors={customColorToGradient(customColor)}
+                      style={tm.customPreviewGrad}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Text style={tm.customPreviewLabel}>Preview</Text>
+                    </LinearGradient>
+                    <Pressable onPress={() => { setCustomColor(null); setHexInput(""); }} style={tm.clearCustomBtn}>
+                      <Feather name="x" size={13} color={Colors.textMuted} />
+                      <Text style={tm.clearCustomText}>Reset</Text>
+                    </Pressable>
+                  </View>
+                )}
+
+                <Text style={tm.customNote}>
+                  Your chosen color tints the app background. Content cards maintain their frosted-glass appearance.
+                </Text>
+              </>
+            )}
+
+            <View style={{ height: 24 }} />
           </ScrollView>
         </View>
       </View>
@@ -510,9 +841,9 @@ export function WalletCardStack({ cards, transactionCounts }: Props) {
             <View style={ov.rewardIcon}>
               <Feather name="dollar-sign" size={13} color={Colors.positive} />
             </View>
-            <View>
-              <Text style={ov.rewardLabel}>Total Cash Back</Text>
-              <Text style={ov.rewardValue}>{formatCurrency(totalCashback)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={ov.rewardLabel} numberOfLines={1}>Total Cash Back</Text>
+              <Text style={ov.rewardValue} numberOfLines={1}>{formatCurrency(totalCashback)}</Text>
             </View>
           </View>
           <View style={ov.rewardDivider} />
@@ -520,9 +851,9 @@ export function WalletCardStack({ cards, transactionCounts }: Props) {
             <View style={[ov.rewardIcon, { backgroundColor: "rgba(108,158,255,0.12)" }]}>
               <Feather name="star" size={13} color={Colors.primary} />
             </View>
-            <View>
-              <Text style={ov.rewardLabel}>Rewards Points</Text>
-              <Text style={[ov.rewardValue, { color: Colors.primary }]}>{formatNumber(totalPoints)} pts</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={ov.rewardLabel} numberOfLines={1}>Rewards Points</Text>
+              <Text style={[ov.rewardValue, { color: Colors.primary }]} numberOfLines={1}>{formatNumber(totalPoints)} pts</Text>
             </View>
           </View>
         </View>
@@ -682,7 +1013,7 @@ const ov = StyleSheet.create({
     elevation: 8,
   },
   rewardsRow: { flexDirection: "row", paddingVertical: 14 },
-  rewardItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16 },
+  rewardItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, overflow: "hidden" },
   rewardIcon: { width: 30, height: 30, borderRadius: 9, backgroundColor: "rgba(74,222,170,0.12)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   rewardLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 1 },
   rewardValue: { fontFamily: "Inter_700Bold", fontSize: 15, color: Colors.positive },
@@ -700,35 +1031,60 @@ const ov = StyleSheet.create({
 
 const tm = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: "90%" },
+  sheet: { backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: "92%" },
   handle: { width: 36, height: 4, backgroundColor: Colors.divider, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
   title: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.textPrimary },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12, marginTop: 4 },
-  swatchRow: { gap: 10, paddingBottom: 4, marginBottom: 16 },
-  swatchWrap: { alignItems: "center", gap: 6, padding: 4, borderRadius: 14, borderWidth: 2, borderColor: "transparent", position: "relative" },
+  tabRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  tabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider },
+  tabBtnActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
+  tabLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textMuted },
+  tabLabelActive: { color: "#fff" },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10, marginTop: 6 },
+  swatchGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
+  swatchWrap2: { alignItems: "center", gap: 5, padding: 4, borderRadius: 12, borderWidth: 2, borderColor: "transparent", position: "relative", width: 56 },
   swatchWrapActive: { borderColor: Colors.primary },
-  swatch: { width: 52, height: 52, borderRadius: 14 },
-  swatchLabel: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.textSecondary, textAlign: "center", maxWidth: 56 },
-  swatchCheck: { position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
-  patternRow: { flexDirection: "row", gap: 8, marginBottom: 20, flexWrap: "wrap" },
-  patternBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider },
-  patternBtnActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
-  patternText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary },
-  patternTextActive: { color: "#fff" },
+  swatch2: { width: 48, height: 48, borderRadius: 12 },
+  swatchLabel2: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textSecondary, textAlign: "center" },
+  swatchCheck: { position: "absolute", top: 5, right: 5, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  patternGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  patternCard: { width: "22%", alignItems: "center", gap: 5, paddingVertical: 10, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider, position: "relative" },
+  patternCardActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
+  patternIconArea: { height: 22, alignItems: "center", justifyContent: "center" },
+  patternCardLabel: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted, textAlign: "center" },
+  patternCardLabelActive: { color: "#fff" },
+  patternCheck: { position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: 7, backgroundColor: "rgba(74,222,170,0.2)", alignItems: "center", justifyContent: "center" },
   cardStyleRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  cardStyleBtn: { flex: 1, padding: 16, borderRadius: 16, alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider },
+  cardStyleBtn: { flex: 1, padding: 14, borderRadius: 14, alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider, position: "relative" },
   cardStyleBtnActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
-  cardStyleLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textMuted, textAlign: "center" },
+  cardStyleLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.textMuted, textAlign: "center" },
   cardStyleLabelActive: { color: "#fff" },
-  cardStyleCheck: { position: "absolute", top: 8, right: 8 },
+  cardStyleCheck: { position: "absolute", top: 7, right: 7 },
   cardColorRow: { flexDirection: "row", gap: 12, marginBottom: 8 },
-  cardColorPreview: { flex: 1, height: 40, borderRadius: 10 },
+  cardColorPreview: { flex: 1, height: 36, borderRadius: 10 },
   cardColorInner: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
   cardColorNote: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "center", marginBottom: 16 },
   classicPreview: { alignItems: "center", gap: 10, marginBottom: 16 },
   classicPreviewCard: { width: "100%", height: 80, borderRadius: 14, padding: 14, justifyContent: "space-between" },
   classicPreviewText: { fontFamily: "Inter_700Bold", fontSize: 14, color: "rgba(255,255,255,0.5)", fontStyle: "italic" },
   classicPreviewNum: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1 },
+  rainbowGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
+  rainbowSwatch: { width: 40, height: 40, borderRadius: 10, overflow: "hidden", borderWidth: 2, borderColor: "transparent", position: "relative" },
+  rainbowSwatchActive: { borderColor: Colors.primary },
+  rainbowSwatchGrad: { flex: 1 },
+  rainbowCheck: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.2)" },
+  hexRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  hexPreview: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  hexInputWrap: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, borderWidth: 1, borderColor: Colors.divider, paddingHorizontal: 12, height: 44 },
+  hexHash: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.textMuted, marginRight: 4 },
+  hexInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 15, color: Colors.textPrimary },
+  hexApplyBtn: { backgroundColor: Colors.primaryDark, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
+  hexApplyText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
+  customPreviewRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  customPreviewGrad: { flex: 1, height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  customPreviewLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "rgba(255,255,255,0.7)" },
+  clearCustomBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider },
+  clearCustomText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textMuted },
+  customNote: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, lineHeight: 17, textAlign: "center", marginBottom: 8 },
 });

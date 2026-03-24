@@ -534,7 +534,7 @@ const stm = StyleSheet.create({
 
 export default function CardListScreen() {
   const { cards, transactions, totalBalance } = useFinance();
-  const { theme } = useTheme();
+  const { theme, effectiveBgStart, effectiveBgEnd } = useTheme();
   const insets = useSafeAreaInsets();
 
   const transactionCounts: Record<string, number> = {};
@@ -565,7 +565,7 @@ export default function CardListScreen() {
   const [stmVisible, setStmVisible] = useState(false);
 
   return (
-    <LinearGradient colors={[theme.bgStart, theme.bgEnd]} style={styles.gradient}>
+    <LinearGradient colors={[effectiveBgStart, effectiveBgEnd]} style={styles.gradient}>
       {/* Damask texture overlay */}
       <Image
         source={require("../../assets/images/bg-damask.png")}
@@ -621,14 +621,14 @@ const sub = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(108,158,255,0.12)",
     borderWidth: 1, borderColor: "rgba(108,158,255,0.25)", alignItems: "center", justifyContent: "center",
   },
-  info: { gap: 4 },
+  info: { gap: 3, flex: 1 },
   title: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textPrimary },
   dots: { flexDirection: "row", alignItems: "center", gap: 5 },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   subCount: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
-  right: { flexDirection: "row", alignItems: "center", gap: 6 },
-  amt: { fontFamily: "Inter_700Bold", fontSize: 15, color: Colors.textPrimary },
-  mo: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted },
+  right: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 12 },
+  amt: { fontFamily: "Inter_700Bold", fontSize: 16, color: Colors.positive },
+  mo: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted },
 });
 
 // ─── Main Screen Styles ───────────────────────────────────────────────────────

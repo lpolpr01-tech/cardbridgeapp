@@ -1,0 +1,301 @@
+Act as a senior backend engineer, fintech systems architect, and TypeScript developer. I am building a private personalized mobile fintech app in Replit. I already have the frontend concept for showing Credit Scores, Credit Health, and Debt Summary on the Card List screen. Now I want you to design and scaffold the backend architecture, API routes, TypeScript models, mock provider adapters, normalization layer, and secure data flow so this feature can later integrate with real credit and liability data providers.
+
+IMPORTANT CONTEXT
+This feature is private and personalized for each logged-in user. The purpose is to let users securely view:
+- 3-bureau credit scores
+- credit health summary
+- debt summary
+- score factors
+- utilization and payment insights
+inside my app.
+
+Do not build a fake public data app. Build the architecture as if this will later connect to real user-permissioned data providers for bureau and liability data.
+
+GOAL
+Create a production-style backend foundation in Replit using TypeScript that can support:
+1. Bureau score data from Equifax, Experian, and TransUnion
+2. Credit profile and score factor normalization
+3. Debt summary and liabilities aggregation
+4. Private per-user data retrieval
+5. Secure API endpoints for the frontend Card List credit section
+
+TECH STACK
+Use:
+- Node.js
+- TypeScript
+- Express or a clean Replit-friendly backend structure
+- modular service architecture
+- environment variables for secrets
+- mock provider adapters for now
+- clear integration points for future real APIs
+- JSON API responses
+- no hardcoded real credentials
+- no fake scraping logic
+
+BACKEND OBJECTIVES
+Build the backend so it can power these frontend cards:
+- CreditScoreOverviewCard
+- CreditHealthCard
+- DebtSummaryCard
+- ScoreFactorsCard
+- PersonalizedRecommendationsCard
+
+ARCHITECTURE REQUIREMENTS
+Create a clean folder structure such as:
+
+/src
+  /api
+  /routes
+  /controllers
+  /services
+  /providers
+  /models
+  /types
+  /utils
+  /middleware
+  /mock
+  /config
+
+or a better version if you think it is cleaner.
+
+CORE API ENDPOINTS
+Create secure routes for:
+- GET /api/credit/profile
+- GET /api/credit/scores
+- GET /api/credit/health
+- GET /api/credit/debt-summary
+- GET /api/credit/insights
+- POST /api/credit/connect
+- POST /api/credit/refresh
+
+Explain and scaffold what each route does.
+
+AUTH / PRIVACY
+Assume users are authenticated.
+Add a simple placeholder auth middleware that simulates a logged-in user id.
+All data returned must be scoped to the authenticated user.
+Do not expose one user’s data to another.
+Reflect privacy-first architecture throughout the code.
+
+DATA MODEL REQUIREMENTS
+Create TypeScript interfaces and normalized models for:
+
+1. Bureau Scores
+- bureau name
+- score value
+- score model if available
+- score category
+- updatedAt
+- provider status
+- confidence or source metadata if useful
+
+2. Credit Profile
+- average score
+- score category
+- bureau scores array
+- payment history status
+- utilization percentage
+- average account age in months
+- recent inquiries
+- derogatory marks count
+- total open accounts
+- total revolving accounts
+- total installment accounts
+- updatedAt
+
+3. Debt Summary
+- total revolving debt
+- total installment debt
+- total overall debt
+- monthly minimum payments
+- total credit limit
+- total utilization percentage
+- number of credit cards
+- number of loans
+- highest balance account
+- liabilities list
+
+4. Liability Account
+- id
+- type
+- issuer
+- name
+- balance
+- minimum payment
+- due date
+- limit
+- APR if available
+- status
+- last updated
+- account subtype
+
+5. Credit Insight
+- id
+- title
+- description
+- impactType positive neutral negative
+- priority
+- recommendation
+
+6. Personalized Recommendation
+- id
+- title
+- body
+- actionType
+- severity
+- relatedAccountId optional
+
+PROVIDER ADAPTER LAYER
+Create a provider adapter pattern so I can later connect real services without rewriting app logic.
+
+Create mock adapters for:
+- EquifaxAdapter
+- ExperianAdapter
+- TransUnionAdapter
+- LiabilityProviderAdapter
+
+Each adapter should return provider-specific mock raw data with slightly different shapes to simulate real-world API differences.
+
+Then create normalization functions that convert all provider responses into one internal unified model.
+
+NORMALIZATION REQUIREMENTS
+Show how raw provider payloads from different bureaus would be transformed into:
+- unified bureau score objects
+- unified credit profile summary
+- unified debt summary
+- unified score insights
+
+The code should clearly separate:
+- raw provider responses
+- normalization logic
+- final API response objects
+
+CREDIT HEALTH LOGIC
+Implement a service that calculates a credit health summary from available data.
+
+Examples:
+- Payment history is strong if no missed payments
+- Utilization is excellent if under 10%, good under 30%, risky above 50%
+- Too many recent inquiries should create a negative insight
+- Older average account age should improve the score profile
+- Derogatory marks should create warning flags
+
+Create helper functions that convert raw data into:
+- health status label such as Excellent, Good, Needs Attention
+- score category label
+- utilization band
+- top positive and negative factors
+
+DEBT SUMMARY LOGIC
+Create a service that aggregates liabilities and computes:
+- total revolving debt
+- total installment debt
+- total debt
+- monthly minimum payments
+- highest balance account
+- total available credit
+- overall revolving utilization
+- debt composition by account type
+
+INSIGHTS ENGINE
+Create an insights engine that generates user-friendly insights and recommendations based on the normalized data.
+
+Examples:
+- “Your utilization is above 50%, which may be lowering your score.”
+- “You have maintained strong payment history.”
+- “Your average account age is relatively low.”
+- “Reducing Card X below 30% utilization may improve your profile.”
+
+These should feed the frontend cards directly.
+
+CONNECT / REFRESH FLOW
+Create a mock connection flow:
+- POST /api/credit/connect simulates linking user credit data sources
+- POST /api/credit/refresh simulates refreshing bureau + liability data
+Store mock connection status in memory or a simple mock store
+
+Also create states for:
+- connected
+- partially connected
+- not connected
+- refresh failed
+- provider unavailable
+
+ERROR HANDLING
+Gracefully handle:
+- missing bureau data
+- one provider down
+- partial liability data
+- invalid user state
+- refresh timeouts
+- unavailable scores
+
+The frontend should still be able to render partial data.
+
+RESPONSE SHAPES
+Design the API responses so they are frontend-friendly and directly usable by my Card List components.
+For example:
+- /api/credit/profile returns a combined payload for the whole credit section
+- /api/credit/scores returns bureau breakdown
+- /api/credit/health returns health metrics and summary label
+- /api/credit/debt-summary returns debt totals and accounts
+- /api/credit/insights returns factors and recommendations
+
+Include example JSON responses.
+
+SECURITY REQUIREMENTS
+Add security-minded comments and patterns:
+- use env vars for provider credentials
+- never log full sensitive data
+- keep provider tokens server-side only
+- validate inputs
+- sanitize responses
+- avoid exposing unnecessary raw provider metadata
+- design with least-privilege principles in mind
+
+MOCK DATA REQUIREMENTS
+Include realistic mock data for:
+- a user with all three bureau scores
+- a user with only two bureau scores
+- a user with connected liabilities but no bureau data yet
+- a user with high utilization and risk factors
+- a user with healthy credit behavior
+
+Make mock data easy to swap out later.
+
+DELIVERABLE
+Return full production-style code scaffolding for:
+- server setup
+- routes
+- controllers
+- services
+- provider adapters
+- models/types
+- normalization utilities
+- mock data sources
+- auth middleware
+- validation helpers
+- example environment config
+- example API responses
+
+Also include:
+- comments explaining where real provider integrations would be added later
+- a short explanation of the architecture
+- notes on how the frontend Card List screen should consume the /api/credit/profile endpoint
+
+IMPORTANT CONSTRAINTS
+- Do not scrape Credit Karma
+- Do not pretend Replit itself gives credit bureau access
+- Do not use fake shortcuts that break privacy
+- Do not mix frontend UI code into this task unless needed for response examples
+- Keep the architecture modular and realistic for future fintech-grade expansion
+
+FINAL OUTPUT FORMAT
+1. architecture overview
+2. folder structure
+3. TypeScript code files
+4. mock data
+5. normalization logic
+6. API route wiring
+7. example responses
+8. explanation of next integration steps for real providers

@@ -1,16 +1,19 @@
 # Finance Dashboard — Mobile Fintech App (Expo React Native)
 
 ## Key Components (artifacts/finance-dashboard/)
-- `components/CreditProfile.tsx` — Full credit intelligence section: `CreditProfileSection` (parent), `CreditScoreOverviewCard`, `CreditHealthCard`, `DebtSummaryCard`, `ScoreFactorsCard`, `PersonalizedRecommendationsCard`. Supports loading/success/partial/no_data/error states, skeleton shimmer loaders, FadeSlideIn entrance animations, TypeScript interfaces + mock data.
-- `components/WalletCardStack.tsx` — Stacked wallet cards with theme customization
+- `components/CreditProfile.tsx` — Full credit intelligence section: `CreditProfileSection` (parent), `CreditScoreOverviewCard`, `CreditHealthCard`, `DebtSummaryCard`, `ScoreFactorsCard`, `PersonalizedRecommendationsCard`. Drill-down modals: `UtilizationModal` (per-card utilization), `PaymentHistoryModal` (calendar), `DebtDrillDownModal` (breakdown pie bar). Bureau layout: Equifax+Experian top row, TransUnion centered below. Supports loading/success/partial/no_data/error states, skeleton shimmer loaders, FadeSlideIn entrance animations.
+- `components/WalletCardStack.tsx` — Stacked wallet cards with 3-tab ThemeModal: Pastel (classic+pastel swatch grids + card style), Pattern (10-pattern grid with icons), Custom (rainbow presets + hex picker). Patterns: none, dots, grid, lines, diamonds, hexagon, baroque, art-deco, zigzag, chevron.
 - `components/BalanceHeader.tsx` — Top balance summary header
 - `app/(tabs)/index.tsx` — Card List screen; renders BalanceHeader → WalletCardStack → SubscriptionsRow → CreditProfileSection
-- `app/(tabs)/pay.tsx` — Pay tab with ACH/crypto scheduling, Pay All preview modals, confetti + success overlay, USDC↔USD swap in CryptoModal
-- `app/(tabs)/options.tsx` — Options/settings tab with damask + glass styling
-- `context/ThemeContext.tsx` — App-wide theme (deep purple-blue default)
+- `app/(tabs)/pay.tsx` — Pay tab with ACH/crypto scheduling, Pay All preview modals, confetti + success overlay with confirmation number (CF-XXXX-XXXX-XXXX), "View Receipt" button, ReceiptModal. Scheduled payments now have non-pressable date pill + info icon button on right to open payment detail.
+- `app/(tabs)/options.tsx` — Settings tab with KycModal (legal info, DOB, address, ID type, tax consent, submit flow), NotificationsModal (Due Date Reminder, Payment Reminder, Statement Balance, Email/SMS delivery), Identity & Compliance section.
+- `context/ThemeContext.tsx` — 7 classic themes + 7 pastel themes, 10 patterns, custom hex color with `effectiveBgStart`/`effectiveBgEnd`; exports `PASTEL_THEMES`, `ALL_THEMES`, `customColorToGradient`
 - `context/FinanceContext.tsx` — Cards, transactions, balance state
 - `constants/colors.ts` — Design tokens (primary, positive, negative, textPrimary, textMuted, divider, etc.)
 - `assets/images/bg-damask.png` — Luxury damask texture background (opacity 0.09–0.13)
+
+## Backend Credit API (artifacts/api-server/)
+- `src/routes/credit.ts` — Credit intelligence REST API: GET /api/credit/profile, /score, /health, /debt, /utilization, /payment-history, /factors, /recommendations. All return mock data matching the CreditProfile component's data shape.
 
 ## Design System
 - Glass cards: `backgroundColor: "rgba(28,14,70,0.88)"`, `borderColor: "rgba(255,255,255,0.11)"`, inline `backdropFilter/boxShadow`

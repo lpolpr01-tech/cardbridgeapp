@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -392,12 +393,15 @@ export function CreditScoreOverviewCard({ data }: { data: CreditProfileData }) {
           </View>
         )}
 
-        {/* Bureau row */}
-        <View style={cs.bureauxRow}>
-          {data.bureaus.map((b, i) => (
-            <React.Fragment key={b.name}>
-              {i > 0 && <View style={cs.bureauDivider} />}
-              <View style={cs.bureauItem}>
+        {/* Bureau layout: Equifax + Experian top row, TransUnion below centered */}
+        {(() => {
+          const eq = data.bureaus.find((b) => b.name === "Equifax");
+          const ex = data.bureaus.find((b) => b.name === "Experian");
+          const tu = data.bureaus.find((b) => b.name === "TransUnion");
+          const renderBureau = (b: typeof eq) => {
+            if (!b) return null;
+            return (
+              <View key={b.name} style={cs.bureauItem}>
                 <Text style={cs.bureauName}>{b.name}</Text>
                 <ScoreArc score={b.score} color={b.color} />
                 {b.score !== null && (
@@ -420,9 +424,26 @@ export function CreditScoreOverviewCard({ data }: { data: CreditProfileData }) {
                   </View>
                 )}
               </View>
-            </React.Fragment>
-          ))}
-        </View>
+            );
+          };
+          return (
+            <View style={cs.bureauSection}>
+              <View style={cs.bureauxTopRow}>
+                {renderBureau(eq)}
+                {eq && ex && <View style={cs.bureauDivider} />}
+                {renderBureau(ex)}
+              </View>
+              {tu && (
+                <>
+                  <View style={cs.bureauHorizontalDivider} />
+                  <View style={cs.bureauxBottomRow}>
+                    {renderBureau(tu)}
+                  </View>
+                </>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Footer */}
         <View style={cs.footer}>
@@ -456,9 +477,9 @@ function HealthBar({ pct, color }: { pct: number; color: string }) {
 }
 
 function HealthRow({
-  icon, label, value, sub, barPct, barColor,
-}: { icon: string; label: string; value: string; sub?: string; barPct?: number; barColor?: string }) {
-  return (
+  icon, label, value, sub, barPct, barColor, onPress,
+}: { icon: string; label: string; value: string; sub?: string; barPct?: number; barColor?: string; onPress?: () => void }) {
+  const content = (
     <View style={hc.row}>
       <View style={[hc.rowIcon, { backgroundColor: `${barColor || Colors.primary}18` }]}>
         <Feather name={icon as any} size={13} color={barColor || Colors.primary} />
@@ -466,7 +487,10 @@ function HealthRow({
       <View style={hc.rowBody}>
         <View style={hc.rowTop}>
           <Text style={hc.rowLabel}>{label}</Text>
-          <Text style={[hc.rowValue, { color: barColor || Colors.textPrimary }]}>{value}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[hc.rowValue, { color: barColor || Colors.textPrimary }]}>{value}</Text>
+            {onPress && <Feather name="chevron-right" size={12} color={Colors.textMuted} />}
+          </View>
         </View>
         {sub && <Text style={hc.rowSub}>{sub}</Text>}
         {barPct !== undefined && barColor && (
@@ -475,9 +499,190 @@ function HealthRow({
       </View>
     </View>
   );
+  if (onPress) {
+    return <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>{content}</Pressable>;
+  }
+  return content;
+}
+
+// ── Utilization Drill-Down Modal ──────────────────────────────────────────────
+
+const MOCK_UTIL_ACCOUNTS = [
+  { name: "Sapphire Reserve", limit: 15000, balance: 2800, color: "#6C9EFF" },
+  { name: "Gold Card", limit: 10000, balance: 4200, color: "#FFD700" },
+  { name: "Ink Business", limit: 8000, balance: 950, color: "#4ADEAA" },
+  { name: "Freedom Flex", limit: 5000, balance: 3300, color: "#FF6B8A" },
+];
+
+function UtilizationModal({ visible, onClose, utilPct }: { visible: boolean; onClose: () => void; utilPct: number }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={drill.overlay}>
+        <View style={drill.sheet}>
+          <View style={drill.handle} />
+          <View style={drill.header}>
+            <View style={drill.headerLeft}>
+              <View style={[drill.iconWrap, { backgroundColor: "rgba(108,158,255,0.15)" }]}>
+                <Feather name="pie-chart" size={16} color={Colors.primary} />
+              </View>
+              <Text style={drill.title}>Credit Utilization</Text>
+            </View>
+            <Pressable onPress={onClose} style={drill.closeBtn}>
+              <Feather name="x" size={18} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={drill.heroRow}>
+            <Text style={[drill.heroNum, { color: utilPct <= 30 ? Colors.positive : utilPct <= 50 ? "#FBBF24" : Colors.negative }]}>
+              {utilPct}%
+            </Text>
+            <Text style={drill.heroLabel}>Overall Utilization</Text>
+            <View style={[drill.heroBadge, { backgroundColor: utilPct <= 30 ? "rgba(74,222,170,0.12)" : "rgba(251,191,36,0.12)", borderColor: utilPct <= 30 ? "rgba(74,222,170,0.3)" : "rgba(251,191,36,0.3)" }]}>
+              <Text style={[drill.heroBadgeText, { color: utilPct <= 30 ? Colors.positive : "#FBBF24" }]}>
+                {utilPct <= 30 ? "Ideal" : "High — reduce to below 30%"}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={drill.subLabel}>Per Account</Text>
+          {MOCK_UTIL_ACCOUNTS.map((acct) => {
+            const pct = Math.round((acct.balance / acct.limit) * 100);
+            const color = pct <= 30 ? Colors.positive : pct <= 50 ? "#FBBF24" : Colors.negative;
+            return (
+              <View key={acct.name} style={drill.acctRow}>
+                <View style={drill.acctLeft}>
+                  <View style={[drill.acctDot, { backgroundColor: acct.color }]} />
+                  <Text style={drill.acctName}>{acct.name}</Text>
+                </View>
+                <View style={drill.acctRight}>
+                  <Text style={[drill.acctPct, { color }]}>{pct}%</Text>
+                  <Text style={drill.acctBal}>${acct.balance.toLocaleString()} / ${acct.limit.toLocaleString()}</Text>
+                  <View style={drill.acctBarBg}>
+                    <View style={[drill.acctBarFill, { width: `${Math.min(pct, 100)}%` as any, backgroundColor: color }]} />
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          <Text style={drill.tip}>Tip: Keep each card below 30% for the best score impact.</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Payment History Calendar Modal ────────────────────────────────────────────
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function PaymentHistoryModal({ visible, onClose, historyPct }: { visible: boolean; onClose: () => void; historyPct: number }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
+
+  const prevMonth = () => {
+    if (month === 0) { setMonth(11); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 11) { setMonth(0); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
+  const days = getDaysInMonth(year, month);
+  const firstDay = getFirstDay(year, month);
+
+  // Simulate: most days paid on time, occasional missed
+  const getStatus = (day: number): "paid" | "missed" | "pending" | "none" => {
+    const cellDate = new Date(year, month, day);
+    if (cellDate > now) return "pending";
+    // Simulate ~97% on time, randomly missed
+    const seed = (year * 12 + month + day * 7) % 31;
+    if (seed === 5 || seed === 14) return "missed";
+    return "paid";
+  };
+
+  const cells = Array.from({ length: firstDay }, () => null).concat(Array.from({ length: days }, (_, i) => i + 1));
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={drill.overlay}>
+        <View style={drill.sheet}>
+          <View style={drill.handle} />
+          <View style={drill.header}>
+            <View style={drill.headerLeft}>
+              <View style={[drill.iconWrap, { backgroundColor: "rgba(74,222,170,0.15)" }]}>
+                <Feather name="check-circle" size={16} color={Colors.positive} />
+              </View>
+              <Text style={drill.title}>Payment History</Text>
+            </View>
+            <Pressable onPress={onClose} style={drill.closeBtn}>
+              <Feather name="x" size={18} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={drill.heroRow}>
+            <Text style={[drill.heroNum, { color: historyPct >= 97 ? Colors.positive : "#FBBF24" }]}>{historyPct}%</Text>
+            <Text style={drill.heroLabel}>On-Time Payments</Text>
+          </View>
+
+          <View style={drill.calNav}>
+            <Pressable onPress={prevMonth} style={drill.calNavBtn}>
+              <Feather name="chevron-left" size={18} color={Colors.textSecondary} />
+            </Pressable>
+            <Text style={drill.calMonth}>{MONTHS[month]} {year}</Text>
+            <Pressable onPress={nextMonth} style={drill.calNavBtn}>
+              <Feather name="chevron-right" size={18} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <View style={drill.calDays}>
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+              <Text key={d} style={drill.calDayLabel}>{d}</Text>
+            ))}
+          </View>
+          <View style={drill.calGrid}>
+            {cells.map((day, i) => {
+              if (day === null) return <View key={`empty-${i}`} style={drill.calCell} />;
+              const status = getStatus(day);
+              const bgColor = status === "paid" ? "rgba(74,222,170,0.15)" : status === "missed" ? "rgba(255,107,138,0.15)" : "transparent";
+              const dotColor = status === "paid" ? Colors.positive : status === "missed" ? Colors.negative : "transparent";
+              return (
+                <View key={day} style={[drill.calCell, { backgroundColor: bgColor, borderRadius: 6 }]}>
+                  <Text style={[drill.calDayNum, { color: status === "pending" ? Colors.textMuted : Colors.textSecondary }]}>{day}</Text>
+                  {status !== "pending" && <View style={[drill.calDot, { backgroundColor: dotColor }]} />}
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={drill.calLegend}>
+            <View style={drill.legendItem}>
+              <View style={[drill.legendDot, { backgroundColor: Colors.positive }]} />
+              <Text style={drill.legendLabel}>On-time</Text>
+            </View>
+            <View style={drill.legendItem}>
+              <View style={[drill.legendDot, { backgroundColor: Colors.negative }]} />
+              <Text style={drill.legendLabel}>Missed</Text>
+            </View>
+            <View style={drill.legendItem}>
+              <View style={[drill.legendDot, { backgroundColor: Colors.divider }]} />
+              <Text style={drill.legendLabel}>Upcoming</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export function CreditHealthCard({ data }: { data: CreditHealthData }) {
+  const [showUtil, setShowUtil] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
   const statusColor =
     data.overallStatus === "Excellent" ? Colors.positive
     : data.overallStatus === "Good" ? "#A3E635"
@@ -506,6 +711,7 @@ export function CreditHealthCard({ data }: { data: CreditHealthData }) {
             sub="On-time payments"
             barPct={data.paymentHistoryPct}
             barColor={data.paymentHistoryPct >= 97 ? Colors.positive : data.paymentHistoryPct >= 90 ? "#A3E635" : "#FBBF24"}
+            onPress={() => setShowHistory(true)}
           />
           <View style={sh.divider} />
           <HealthRow
@@ -515,6 +721,7 @@ export function CreditHealthCard({ data }: { data: CreditHealthData }) {
             sub={data.utilizationPct <= 30 ? "Ideal range" : "Reduce to below 30%"}
             barPct={Math.min(data.utilizationPct, 100)}
             barColor={utilColor}
+            onPress={() => setShowUtil(true)}
           />
           <View style={sh.divider} />
           <HealthRow
@@ -541,6 +748,9 @@ export function CreditHealthCard({ data }: { data: CreditHealthData }) {
         </View>
         <PrivacyBadge label="Visible only on your account" />
       </View>
+
+      <UtilizationModal visible={showUtil} onClose={() => setShowUtil(false)} utilPct={data.utilizationPct} />
+      <PaymentHistoryModal visible={showHistory} onClose={() => setShowHistory(false)} historyPct={data.paymentHistoryPct} />
     </FadeSlideIn>
   );
 }
@@ -558,14 +768,92 @@ function DebtLine({ label, amount, color }: { label: string; amount: number; col
   );
 }
 
+// ── Debt Summary Drill-Down Modal ─────────────────────────────────────────────
+
+const DEBT_SEGMENTS = [
+  { key: "creditCards",   label: "Credit Cards",    color: "#9B5CF5" },
+  { key: "autoLoans",     label: "Auto Loans",      color: "#3E8EDD" },
+  { key: "personalLoans", label: "Personal Loans",  color: "#F59E0B" },
+  { key: "studentLoans",  label: "Student Loans",   color: "#4ADEAA" },
+  { key: "other",         label: "Other",           color: "#94A3B8" },
+];
+
+function DebtDrillDownModal({ visible, onClose, data }: { visible: boolean; onClose: () => void; data: DebtSummaryData }) {
+  const total = data.totalRevolving + data.totalInstallment;
+  const segments = DEBT_SEGMENTS.filter((s) => (data as any)[s.key] > 0);
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={drill.overlay}>
+        <View style={drill.sheet}>
+          <View style={drill.handle} />
+          <View style={drill.header}>
+            <View style={drill.headerLeft}>
+              <View style={[drill.iconWrap, { backgroundColor: "rgba(255,107,138,0.15)" }]}>
+                <Feather name="bar-chart-2" size={16} color={Colors.negative} />
+              </View>
+              <Text style={drill.title}>Debt Breakdown</Text>
+            </View>
+            <Pressable onPress={onClose} style={drill.closeBtn}>
+              <Feather name="x" size={18} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={drill.debtHeroRow}>
+            <Text style={[drill.heroNum, { color: Colors.textPrimary }]}>{fmtCurrency(total)}</Text>
+            <Text style={drill.heroLabel}>Total Debt Balance</Text>
+            <View style={drill.debtBar}>
+              {segments.map((s) => {
+                const amt = (data as any)[s.key] as number;
+                const pct = total > 0 ? (amt / total) * 100 : 0;
+                return <View key={s.key} style={[drill.debtBarSeg, { width: `${pct}%` as any, backgroundColor: s.color }]} />;
+              })}
+            </View>
+          </View>
+
+          <Text style={drill.subLabel}>By Category</Text>
+          <View style={drill.debtLegend}>
+            {segments.map((s) => {
+              const amt = (data as any)[s.key] as number;
+              const pct = total > 0 ? ((amt / total) * 100).toFixed(0) : "0";
+              return (
+                <View key={s.key} style={drill.debtLegRow}>
+                  <View style={[drill.debtLegDot, { backgroundColor: s.color }]} />
+                  <Text style={drill.debtLegLabel}>{s.label}</Text>
+                  <Text style={drill.debtLegPct}>{pct}%</Text>
+                  <Text style={drill.debtLegAmt}>{fmtCurrency(amt)}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function DebtSummaryCard({ data }: { data: DebtSummaryData }) {
   const total = data.totalRevolving + data.totalInstallment;
   const [expanded, setExpanded] = useState(false);
+  const [showDrill, setShowDrill] = useState(false);
 
   return (
     <FadeSlideIn delay={160}>
       <View style={[sh.card, GLASS]}>
-        <CardHeader icon="bar-chart-2" title="Debt Summary" />
+        <CardHeader
+          icon="bar-chart-2"
+          title="Debt Summary"
+          badge={
+            <Pressable
+              onPress={() => setShowDrill(true)}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, padding: 4 }]}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,107,138,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(255,107,138,0.2)" }}>
+                <Feather name="pie-chart" size={11} color={Colors.negative} />
+                <Text style={{ fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.negative }}>Breakdown</Text>
+              </View>
+            </Pressable>
+          }
+        />
 
         {/* Total hero */}
         <View style={ds.hero}>
@@ -637,6 +925,7 @@ export function DebtSummaryCard({ data }: { data: DebtSummaryData }) {
         )}
         <PrivacyBadge />
       </View>
+      <DebtDrillDownModal visible={showDrill} onClose={() => setShowDrill(false)} data={data} />
     </FadeSlideIn>
   );
 }
@@ -868,7 +1157,10 @@ const cs = StyleSheet.create({
   barDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#fff", borderWidth: 3, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4, elevation: 4, marginLeft: -8 },
   barLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
   barLabel: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted },
-  bureauxRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)", marginHorizontal: -18 },
+  bureauSection: { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)", marginHorizontal: -18 },
+  bureauxTopRow: { flexDirection: "row" },
+  bureauxBottomRow: { flexDirection: "row", justifyContent: "center", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
+  bureauHorizontalDivider: {},
   bureauItem: { flex: 1, alignItems: "center", paddingVertical: 14, paddingHorizontal: 4, gap: 5 },
   bureauDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.07)", marginVertical: 10 },
   bureauName: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
@@ -933,6 +1225,56 @@ const sf = StyleSheet.create({
   title: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textPrimary, flex: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   explanation: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+});
+
+// Drill-down modal styles
+const drill = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: "#140D38", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "88%", gap: 0 },
+  handle: { width: 36, height: 4, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  title: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.textPrimary },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  heroRow: { alignItems: "center", gap: 4, marginBottom: 18, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)" },
+  heroNum: { fontFamily: "Inter_700Bold", fontSize: 40, letterSpacing: -1 },
+  heroLabel: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textMuted },
+  heroBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, marginTop: 4 },
+  heroBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  subLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10, marginTop: 4 },
+  acctRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  acctLeft: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  acctDot: { width: 8, height: 8, borderRadius: 4 },
+  acctName: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  acctRight: { alignItems: "flex-end", gap: 2, minWidth: 120 },
+  acctPct: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  acctBal: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textMuted },
+  acctBarBg: { width: 100, height: 4, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden", marginTop: 2 },
+  acctBarFill: { height: 4, borderRadius: 2 },
+  tip: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "center", marginTop: 14, lineHeight: 16 },
+  calNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  calNavBtn: { padding: 8 },
+  calMonth: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.textPrimary },
+  calDays: { flexDirection: "row", marginBottom: 6 },
+  calDayLabel: { flex: 1, textAlign: "center", fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.textMuted },
+  calGrid: { flexDirection: "row", flexWrap: "wrap" },
+  calCell: { width: `${100 / 7}%` as any, aspectRatio: 1, alignItems: "center", justifyContent: "center", gap: 1 },
+  calDayNum: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  calDot: { width: 4, height: 4, borderRadius: 2 },
+  calLegend: { flexDirection: "row", justifyContent: "center", gap: 18, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)" },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendDot: { width: 7, height: 7, borderRadius: 3.5 },
+  legendLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted },
+  debtHeroRow: { alignItems: "center", gap: 3, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)", marginBottom: 14 },
+  debtBar: { flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", width: "100%", marginTop: 10 },
+  debtBarSeg: { height: 8 },
+  debtLegend: { gap: 10 },
+  debtLegRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  debtLegDot: { width: 8, height: 8, borderRadius: 4 },
+  debtLegLabel: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
+  debtLegAmt: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textPrimary },
+  debtLegPct: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, width: 36, textAlign: "right" },
 });
 
 // Recommendations styles

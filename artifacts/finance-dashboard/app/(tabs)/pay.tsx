@@ -1878,12 +1878,110 @@ const confSt = StyleSheet.create({
 
 type PaySuccessType = "ach" | "crypto";
 
+// ─── Receipt Modal ─────────────────────────────────────────────────────────────
+
+function ReceiptModal({
+  visible, type, amount, confirmationNum, onClose,
+}: { visible: boolean; type: PaySuccessType; amount: number; confirmationNum: string; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const isAch = type === "ach";
+
+  const ReceiptRow = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
+    <View style={rcpt.row}>
+      <Text style={rcpt.rowLabel}>{label}</Text>
+      <Text style={[rcpt.rowValue, accent && { color: Colors.positive }]}>{value}</Text>
+    </View>
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={rcpt.overlay}>
+        <View style={[rcpt.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={rcpt.handle} />
+          <View style={rcpt.header}>
+            <View style={rcpt.headerLeft}>
+              <Feather name="file-text" size={20} color={Colors.positive} />
+              <Text style={rcpt.title}>Payment Receipt</Text>
+            </View>
+            <Pressable onPress={onClose} style={rcpt.closeBtn}>
+              <Feather name="x" size={18} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={rcpt.heroSection}>
+            <View style={rcpt.heroIcon}>
+              <Feather name="check-circle" size={32} color={Colors.positive} />
+            </View>
+            <Text style={rcpt.heroAmt}>{formatCurrency(amount)}</Text>
+            <Text style={rcpt.heroLabel}>{isAch ? "ACH Payment" : "Crypto Payment"}</Text>
+          </View>
+
+          <View style={rcpt.card}>
+            <ReceiptRow label="Date" value={dateStr} />
+            <View style={rcpt.rowDivider} />
+            <ReceiptRow label="Time" value={timeStr} />
+            <View style={rcpt.rowDivider} />
+            <ReceiptRow label="Amount" value={formatCurrency(amount)} accent />
+            <View style={rcpt.rowDivider} />
+            <ReceiptRow label="Method" value={isAch ? "ACH Transfer" : "Crypto → ACH"} />
+            <View style={rcpt.rowDivider} />
+            <ReceiptRow label="Status" value={isAch ? "Submitted" : "Queued"} accent />
+            <View style={rcpt.rowDivider} />
+            <ReceiptRow label="Est. Arrival" value={isAch ? "1–4 Business Days" : "On Scheduled Date"} />
+          </View>
+
+          <View style={rcpt.confirmWrap}>
+            <Text style={rcpt.confirmLabel}>Confirmation Number</Text>
+            <Text style={rcpt.confirmNum}>{confirmationNum}</Text>
+          </View>
+
+          <Text style={rcpt.disclaimer}>Keep this confirmation number for your records. CardFlow will send a confirmation email within 5 minutes.</Text>
+
+          <Pressable onPress={onClose} style={({ pressed }) => [rcpt.doneBtn, pressed && { opacity: 0.85 }]}>
+            <Text style={rcpt.doneBtnText}>Close Receipt</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const rcpt = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: "#140D38", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: "92%" },
+  handle: { width: 36, height: 4, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  title: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.textPrimary },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  heroSection: { alignItems: "center", gap: 6, marginBottom: 20 },
+  heroIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(74,222,170,0.12)", borderWidth: 1.5, borderColor: "rgba(74,222,170,0.3)", alignItems: "center", justifyContent: "center" },
+  heroAmt: { fontFamily: "Inter_700Bold", fontSize: 34, color: Colors.positive, letterSpacing: -0.5 },
+  heroLabel: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textMuted },
+  card: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", marginBottom: 16 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 13 },
+  rowLabel: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textMuted },
+  rowValue: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textPrimary },
+  rowDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginHorizontal: 16 },
+  confirmWrap: { backgroundColor: "rgba(108,158,255,0.08)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(108,158,255,0.2)", padding: 16, alignItems: "center", gap: 6, marginBottom: 12 },
+  confirmLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1 },
+  confirmNum: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.primary, letterSpacing: 2 },
+  disclaimer: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, textAlign: "center", lineHeight: 17, marginBottom: 18, paddingHorizontal: 8 },
+  doneBtn: { backgroundColor: "rgba(108,158,255,0.15)", borderRadius: 14, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: "rgba(108,158,255,0.3)" },
+  doneBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.primary },
+});
+
 function PaySuccessOverlay({
   visible,
   type,
   amount,
+  confirmationNum,
   onDone,
-}: { visible: boolean; type: PaySuccessType; amount: number; onDone: () => void }) {
+  onViewReceipt,
+}: { visible: boolean; type: PaySuccessType; amount: number; confirmationNum: string; onDone: () => void; onViewReceipt: () => void }) {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
@@ -1915,6 +2013,21 @@ function PaySuccessOverlay({
         <Text style={pSucc.title}>{title}</Text>
         <Text style={pSucc.amount}>{formatCurrency(amount)}</Text>
         <Text style={pSucc.msg}>{msg}</Text>
+
+        {/* Confirmation number */}
+        <View style={pSucc.confirmRow}>
+          <Text style={pSucc.confirmLabel}>Confirmation</Text>
+          <Text style={pSucc.confirmNum}>{confirmationNum}</Text>
+        </View>
+
+        <Pressable
+          onPress={onViewReceipt}
+          style={({ pressed }) => [pSucc.receiptBtn, pressed && { opacity: 0.8 }]}
+        >
+          <Feather name="file-text" size={14} color={Colors.primary} />
+          <Text style={pSucc.receiptBtnText}>View Receipt</Text>
+        </Pressable>
+
         <Pressable
           onPress={onDone}
           style={({ pressed }) => [pSucc.doneBtn, pressed && { opacity: 0.85 }]}
@@ -1943,10 +2056,10 @@ const pSucc = StyleSheet.create({
   card: {
     backgroundColor: "#0E0828",
     borderRadius: 28,
-    padding: 32,
+    padding: 28,
     alignItems: "center",
-    gap: 14,
-    marginHorizontal: 28,
+    gap: 12,
+    marginHorizontal: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     shadowColor: "#9B5CF5",
@@ -1969,7 +2082,12 @@ const pSucc = StyleSheet.create({
   title: { fontFamily: "Inter_700Bold", fontSize: 22, color: Colors.textPrimary, textAlign: "center" },
   amount: { fontFamily: "Inter_700Bold", fontSize: 32, color: Colors.positive, letterSpacing: -0.5 },
   msg: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, textAlign: "center", lineHeight: 20, paddingHorizontal: 8 },
-  doneBtn: { borderRadius: 14, overflow: "hidden", marginTop: 8, width: "100%" },
+  confirmRow: { backgroundColor: "rgba(108,158,255,0.08)", borderRadius: 10, borderWidth: 1, borderColor: "rgba(108,158,255,0.2)", paddingHorizontal: 14, paddingVertical: 10, alignItems: "center", gap: 3, width: "100%" },
+  confirmLabel: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1 },
+  confirmNum: { fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.primary, letterSpacing: 1.5 },
+  receiptBtn: { flexDirection: "row", alignItems: "center", gap: 7, borderRadius: 12, borderWidth: 1, borderColor: "rgba(108,158,255,0.3)", paddingHorizontal: 18, paddingVertical: 10, backgroundColor: "rgba(108,158,255,0.08)", width: "100%", justifyContent: "center" },
+  receiptBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.primary },
+  doneBtn: { borderRadius: 14, overflow: "hidden", width: "100%" },
   doneBtnGrad: { paddingVertical: 15, alignItems: "center" },
   doneBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
 });
@@ -2268,6 +2386,8 @@ export default function PayScreen() {
   const [successVisible, setSuccessVisible]             = useState(false);
   const [successType, setSuccessType]                   = useState<PaySuccessType>("ach");
   const [successAmount, setSuccessAmount]               = useState(0);
+  const [successConfirmNum, setSuccessConfirmNum]       = useState("");
+  const [receiptVisible, setReceiptVisible]             = useState(false);
   const [confettiVisible, setConfettiVisible]           = useState(false);
 
   // Scroll tracking
@@ -2300,9 +2420,17 @@ export default function PayScreen() {
   const totalDebit  = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0), [transactions]);
   const totalCredit = useMemo(() => transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0), [transactions]);
 
+  const generateConfirmationNumber = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const segment = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `CF-${segment(4)}-${segment(4)}-${segment(4)}`;
+  };
+
   const triggerSuccess = (type: PaySuccessType, amount: number) => {
+    const confirmNum = generateConfirmationNumber();
     setSuccessType(type);
     setSuccessAmount(amount);
+    setSuccessConfirmNum(confirmNum);
     setConfettiVisible(true);
     setTimeout(() => {
       setConfettiVisible(false);
@@ -2356,10 +2484,10 @@ export default function PayScreen() {
     ? new Date(txCycle.year, txCycle.month, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : "All";
 
-  const { theme } = useTheme();
+  const { theme, effectiveBgStart, effectiveBgEnd } = useTheme();
 
   return (
-    <LinearGradient colors={[theme.bgStart, theme.bgEnd]} style={styles.gradient}>
+    <LinearGradient colors={[effectiveBgStart, effectiveBgEnd]} style={styles.gradient}>
       <Image source={BG_DAMASK} style={styles.bgTexture} resizeMode="cover" />
 
       {/* ── Full-page FlatList — everything scrolls ── */}
@@ -2434,20 +2562,22 @@ export default function PayScreen() {
                     return (
                       <View key={sp.id} style={[styles.scheduledCard, GLASS_INLINE]}>
                         <View style={styles.scheduledTop}>
-                          <Pressable
-                            onPress={() => { Haptics.selectionAsync(); setSelectedPayment(sp); }}
-                            style={({ pressed }) => [styles.datePill, pressed && { opacity: 0.75 }]}
-                          >
+                          <View style={styles.datePill}>
                             <Feather name="calendar" size={13} color={Colors.primary} />
                             <Text style={styles.datePillText}>{formatDateDisplay(sp.date)}</Text>
-                            <View style={styles.datePillChevron}>
-                              <Feather name="chevron-right" size={11} color={Colors.primary} />
+                          </View>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <View style={[styles.statusBadge, { backgroundColor: sp.status === "pending" ? "rgba(108,158,255,0.15)" : "rgba(74,222,170,0.15)" }]}>
+                              <Text style={[styles.statusText, { color: sp.status === "pending" ? Colors.primary : Colors.positive }]}>
+                                {sp.status === "pending" ? "Pending" : "Completed"}
+                              </Text>
                             </View>
-                          </Pressable>
-                          <View style={[styles.statusBadge, { backgroundColor: sp.status === "pending" ? "rgba(108,158,255,0.15)" : "rgba(74,222,170,0.15)" }]}>
-                            <Text style={[styles.statusText, { color: sp.status === "pending" ? Colors.primary : Colors.positive }]}>
-                              {sp.status === "pending" ? "Pending" : "Completed"}
-                            </Text>
+                            <Pressable
+                              onPress={() => { Haptics.selectionAsync(); setSelectedPayment(sp); }}
+                              style={({ pressed }) => [styles.schedInfoBtn, pressed && { opacity: 0.7 }]}
+                            >
+                              <Feather name="info" size={15} color={Colors.primary} />
+                            </Pressable>
                           </View>
                         </View>
                         {sp.note ? <Text style={styles.scheduledNote}>{sp.note}</Text> : null}
@@ -2628,7 +2758,16 @@ export default function PayScreen() {
         visible={successVisible}
         type={successType}
         amount={successAmount}
+        confirmationNum={successConfirmNum}
         onDone={() => setSuccessVisible(false)}
+        onViewReceipt={() => { setSuccessVisible(false); setReceiptVisible(true); }}
+      />
+      <ReceiptModal
+        visible={receiptVisible}
+        type={successType}
+        amount={successAmount}
+        confirmationNum={successConfirmNum}
+        onClose={() => setReceiptVisible(false)}
       />
     </LinearGradient>
   );
@@ -2765,6 +2904,16 @@ const styles = StyleSheet.create({
   },
   datePillChevron: {
     marginLeft: 2,
+  },
+  schedInfoBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(108,158,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(108,158,255,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   statusBadge: {
     paddingHorizontal: 10,

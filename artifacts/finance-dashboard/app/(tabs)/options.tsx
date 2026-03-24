@@ -780,6 +780,268 @@ function PersonalInfoModal({
   );
 }
 
+// ─── KYC Modal ────────────────────────────────────────────────────────────────
+
+function KycModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const [legalFirst, setLegalFirst] = useState("Luis");
+  const [legalMiddle, setLegalMiddle] = useState("");
+  const [legalLast, setLegalLast] = useState("Pol");
+  const [dob, setDob] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [stateVal, setStateVal] = useState("");
+  const [zip, setZip] = useState("");
+  const [idType, setIdType] = useState<"passport" | "license" | "id">("license");
+  const [idNumber, setIdNumber] = useState("");
+  const [ssn, setSsn] = useState("");
+  const [taxConsent, setTaxConsent] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const ID_TYPES: { key: "passport" | "license" | "id"; label: string }[] = [
+    { key: "license", label: "Driver's License" },
+    { key: "passport", label: "Passport" },
+    { key: "id", label: "State ID" },
+  ];
+
+  const handleSubmit = () => {
+    if (!legalFirst.trim() || !legalLast.trim()) {
+      Alert.alert("Required", "Legal name is required."); return;
+    }
+    if (!dob.trim()) {
+      Alert.alert("Required", "Date of birth is required."); return;
+    }
+    if (!address.trim() || !city.trim() || !stateVal.trim() || !zip.trim()) {
+      Alert.alert("Required", "Full address is required."); return;
+    }
+    if (!idNumber.trim()) {
+      Alert.alert("Required", "ID number is required."); return;
+    }
+    if (!taxConsent) {
+      Alert.alert("Consent Required", "Please consent to tax reporting to continue."); return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+        <View style={kyc.overlay}>
+          <View style={[kyc.sheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={kyc.successWrap}>
+              <View style={kyc.successIcon}><Feather name="shield" size={36} color={Colors.positive} /></View>
+              <Text style={kyc.successTitle}>Identity Verified</Text>
+              <Text style={kyc.successSub}>Your identity documents have been submitted for review. You'll be notified within 1–2 business days.</Text>
+              <Pressable onPress={() => { setSubmitted(false); onClose(); }} style={kyc.successBtn}>
+                <Text style={kyc.successBtnText}>Done</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={kyc.overlay}>
+        <View style={[kyc.sheet, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={kyc.handle} />
+          <View style={kyc.header}>
+            <View style={kyc.headerLeft}>
+              <View style={kyc.iconWrap}>
+                <Feather name="shield" size={16} color={Colors.primary} />
+              </View>
+              <Text style={kyc.title}>Identity Verification</Text>
+            </View>
+            <Pressable onPress={onClose} style={kyc.closeBtn}>
+              <Feather name="x" size={18} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={kyc.sectionLabel}>Legal Name</Text>
+            <TextInput style={kyc.input} value={legalFirst} onChangeText={setLegalFirst} placeholder="Legal first name" placeholderTextColor={Colors.textMuted} />
+            <TextInput style={kyc.input} value={legalMiddle} onChangeText={setLegalMiddle} placeholder="Middle name (optional)" placeholderTextColor={Colors.textMuted} />
+            <TextInput style={kyc.input} value={legalLast} onChangeText={setLegalLast} placeholder="Legal last name" placeholderTextColor={Colors.textMuted} />
+
+            <Text style={kyc.sectionLabel}>Date of Birth</Text>
+            <TextInput style={kyc.input} value={dob} onChangeText={setDob} placeholder="MM/DD/YYYY" placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" />
+
+            <Text style={kyc.sectionLabel}>Residential Address</Text>
+            <TextInput style={kyc.input} value={address} onChangeText={setAddress} placeholder="Street address" placeholderTextColor={Colors.textMuted} />
+            <View style={kyc.row2}>
+              <TextInput style={[kyc.input, { flex: 1 }]} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={Colors.textMuted} />
+              <TextInput style={[kyc.input, { width: 56 }]} value={stateVal} onChangeText={setStateVal} placeholder="ST" placeholderTextColor={Colors.textMuted} maxLength={2} autoCapitalize="characters" />
+              <TextInput style={[kyc.input, { width: 80 }]} value={zip} onChangeText={setZip} placeholder="ZIP" placeholderTextColor={Colors.textMuted} keyboardType="number-pad" maxLength={5} />
+            </View>
+
+            <Text style={kyc.sectionLabel}>Government-Issued ID</Text>
+            <View style={kyc.idTypeRow}>
+              {ID_TYPES.map((t) => (
+                <Pressable key={t.key} onPress={() => setIdType(t.key)} style={[kyc.idTypeBtn, idType === t.key && kyc.idTypeBtnActive]}>
+                  <Text style={[kyc.idTypeBtnText, idType === t.key && kyc.idTypeBtnTextActive]}>{t.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput style={kyc.input} value={idNumber} onChangeText={setIdNumber} placeholder="ID / Document number" placeholderTextColor={Colors.textMuted} autoCapitalize="characters" />
+
+            <Text style={kyc.sectionLabel}>Tax & Consent</Text>
+            <TextInput style={kyc.input} value={ssn} onChangeText={setSsn} placeholder="SSN / Tax ID (optional)" placeholderTextColor={Colors.textMuted} keyboardType="number-pad" secureTextEntry />
+            <Pressable onPress={() => { Haptics.selectionAsync(); setTaxConsent((c) => !c); }} style={kyc.consentRow}>
+              <View style={[kyc.checkBox, taxConsent && kyc.checkBoxActive]}>
+                {taxConsent && <Feather name="check" size={12} color="#fff" />}
+              </View>
+              <Text style={kyc.consentText}>I consent to tax reporting obligations and agree to CardFlow's identity verification terms and conditions.</Text>
+            </Pressable>
+
+            <Pressable onPress={handleSubmit} style={({ pressed }) => [kyc.submitBtn, pressed && { opacity: 0.85 }]}>
+              <Feather name="shield" size={16} color="#fff" />
+              <Text style={kyc.submitBtnText}>Submit Verification</Text>
+            </Pressable>
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const kyc = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: "92%" },
+  handle: { width: 36, height: 4, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(108,158,255,0.15)", alignItems: "center", justifyContent: "center" },
+  title: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.textPrimary },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginTop: 16, marginBottom: 8 },
+  input: { backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", paddingHorizontal: 14, paddingVertical: 13, fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textPrimary, marginBottom: 8 },
+  row2: { flexDirection: "row", gap: 8 },
+  idTypeRow: { flexDirection: "row", gap: 8, marginBottom: 8, flexWrap: "wrap" },
+  idTypeBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  idTypeBtnActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
+  idTypeBtnText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textMuted },
+  idTypeBtnTextActive: { color: "#fff" },
+  consentRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, marginBottom: 8 },
+  checkBox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  checkBoxActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
+  consentText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 18, flex: 1 },
+  submitBtn: { borderRadius: 14, backgroundColor: Colors.primaryDark, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15, marginTop: 4 },
+  submitBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+  successWrap: { alignItems: "center", gap: 14, paddingVertical: 40 },
+  successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: "rgba(74,222,170,0.12)", borderWidth: 1.5, borderColor: "rgba(74,222,170,0.3)", alignItems: "center", justifyContent: "center" },
+  successTitle: { fontFamily: "Inter_700Bold", fontSize: 22, color: Colors.textPrimary },
+  successSub: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, textAlign: "center", lineHeight: 20, paddingHorizontal: 20 },
+  successBtn: { backgroundColor: Colors.primaryDark, borderRadius: 14, paddingHorizontal: 40, paddingVertical: 14, marginTop: 8 },
+  successBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+});
+
+// ─── Notifications Modal ───────────────────────────────────────────────────────
+
+type NotifPrefs = {
+  dueDateReminder: boolean;
+  paymentReminder: boolean;
+  statementReady: boolean;
+  emailDelivery: boolean;
+  smsDelivery: boolean;
+};
+
+function NotificationsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const [prefs, setPrefs] = useState<NotifPrefs>({
+    dueDateReminder: true,
+    paymentReminder: true,
+    statementReady: true,
+    emailDelivery: false,
+    smsDelivery: true,
+  });
+  const toggle = (key: keyof NotifPrefs) => {
+    Haptics.selectionAsync();
+    setPrefs((p) => ({ ...p, [key]: !p[key] }));
+  };
+
+  const NotifRow = ({ label, sub, k }: { label: string; sub?: string; k: keyof NotifPrefs }) => (
+    <View style={notif.row}>
+      <View style={notif.rowInfo}>
+        <Text style={notif.rowLabel}>{label}</Text>
+        {sub && <Text style={notif.rowSub}>{sub}</Text>}
+      </View>
+      <Switch
+        value={prefs[k]}
+        onValueChange={() => toggle(k)}
+        trackColor={{ false: "rgba(255,255,255,0.12)", true: Colors.primary }}
+        thumbColor={prefs[k] ? "#fff" : "rgba(255,255,255,0.5)"}
+      />
+    </View>
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={notif.overlay}>
+        <View style={[notif.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={notif.handle} />
+          <View style={notif.header}>
+            <View style={notif.headerLeft}>
+              <View style={notif.iconWrap}>
+                <Feather name="bell" size={16} color={Colors.primary} />
+              </View>
+              <Text style={notif.title}>Notification Preferences</Text>
+            </View>
+            <Pressable onPress={onClose} style={notif.closeBtn}>
+              <Feather name="x" size={18} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <Text style={notif.sectionLabel}>Alerts</Text>
+          <View style={notif.group}>
+            <NotifRow label="Due Date Reminder" sub="3 days before payment is due" k="dueDateReminder" />
+            <View style={notif.divider} />
+            <NotifRow label="Payment Reminder" sub="Day of scheduled payment" k="paymentReminder" />
+            <View style={notif.divider} />
+            <NotifRow label="Statement Balance Ready" sub="When monthly statement is available" k="statementReady" />
+          </View>
+
+          <Text style={notif.sectionLabel}>Delivery Method</Text>
+          <View style={notif.group}>
+            <NotifRow label="Email" sub="Sent to your registered email" k="emailDelivery" />
+            <View style={notif.divider} />
+            <NotifRow label="SMS / Text" sub="Sent to your phone number" k="smsDelivery" />
+          </View>
+
+          <Pressable
+            onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onClose(); }}
+            style={({ pressed }) => [notif.saveBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={notif.saveBtnText}>Save Preferences</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const notif = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  handle: { width: 36, height: 4, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(108,158,255,0.15)", alignItems: "center", justifyContent: "center" },
+  title: { fontFamily: "Inter_700Bold", fontSize: 17, color: Colors.textPrimary },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10, marginTop: 16 },
+  group: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.09)", marginBottom: 4 },
+  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
+  rowInfo: { flex: 1 },
+  rowLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textPrimary },
+  rowSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  divider: { height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginHorizontal: 16 },
+  saveBtn: { backgroundColor: Colors.primaryDark, borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 20 },
+  saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+});
+
 // ─── Setting Row ──────────────────────────────────────────────────────────────
 
 type SettingRowProps = {
@@ -817,9 +1079,10 @@ function SectionLabel({ text }: { text: string }) {
 export default function OptionsScreen() {
   const insets = useSafeAreaInsets();
   const { cards, transactions, bankAccounts } = useFinance();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [biometricEnabled, setBiometricEnabled] = React.useState(false);
   const [addBankVisible, setAddBankVisible] = useState(false);
+  const [kycVisible, setKycVisible] = useState(false);
+  const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
 
   const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
     firstName: "Luis",
@@ -847,10 +1110,10 @@ export default function OptionsScreen() {
 
   const totalCredit = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
 
-  const { theme } = useTheme();
+  const { theme, effectiveBgStart, effectiveBgEnd } = useTheme();
 
   return (
-    <LinearGradient colors={[theme.bgStart, theme.bgEnd]} style={styles.gradient}>
+    <LinearGradient colors={[effectiveBgStart, effectiveBgEnd]} style={styles.gradient}>
       <Image source={BG_DAMASK} style={styles.bgTexture} resizeMode="cover" />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -958,9 +1221,14 @@ export default function OptionsScreen() {
 
         <SectionLabel text="Notifications" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow icon="bell" label="Push Notifications" toggle toggleValue={notificationsEnabled} onToggle={setNotificationsEnabled} />
+          <SettingRow icon="bell" label="Notification Preferences" subtitle="Manage alerts & delivery methods" onPress={() => setNotifPrefsVisible(true)} />
           <View style={styles.rowDivider} />
           <SettingRow icon="mail" label="Email Reports" subtitle="Weekly spending summary" onPress={() => {}} />
+        </View>
+
+        <SectionLabel text="Identity & Compliance" />
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
+          <SettingRow icon="shield" label="Identity Verification" subtitle="Submit KYC documents" onPress={() => setKycVisible(true)} />
         </View>
 
         <SectionLabel text="Support" />
@@ -1004,6 +1272,8 @@ export default function OptionsScreen() {
         onAdd={(uri, zoom) => setProfilePhoto({ uri })}
         onClose={() => setPickerVisible(false)}
       />
+      <KycModal visible={kycVisible} onClose={() => setKycVisible(false)} />
+      <NotificationsModal visible={notifPrefsVisible} onClose={() => setNotifPrefsVisible(false)} />
     </LinearGradient>
   );
 }

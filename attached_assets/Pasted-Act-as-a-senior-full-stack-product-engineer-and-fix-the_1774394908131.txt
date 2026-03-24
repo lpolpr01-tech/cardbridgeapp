@@ -1,0 +1,316 @@
+Act as a senior full-stack product engineer and fix the current UI/UX bugs while implementing the missing features in a structured, production-minded way. Do not do superficial patches. Refactor where needed so the new behavior is reliable, reusable, and visually consistent across the app.
+
+Core instruction:
+Preserve the existing premium purple luxury fintech aesthetic, theme system, and layered card/glass surface design. All new features and fixes must feel native to the product, not bolted on.
+
+==================================================
+1. UNIFY PAYMENT COMPLETION FLOW ACROSS ALL PAYMENTS
+==================================================
+
+Current issue:
+Manual scheduled payments already show a congratulations alert when completed, but Pay All ACH and Pay All Crypto do not consistently use the same polished completion system.
+
+What to do:
+Create one shared payment finalization success flow that is reused for:
+- Manual scheduled payments
+- Pay All ACH payments
+- Pay All Crypto payments
+- Any other completed payment action in the Pay tab
+
+Requirements:
+- Reuse the same congratulations/success experience across all payment finalizations
+- Keep the premium styling, confetti, and confirmation behavior consistent
+- Each completed transaction must generate and display a confirmation/reference number
+- That confirmation/reference number should be usable by both the user and the app to verify:
+  - completed status
+  - pending status
+  - cancellation
+  - future support lookup
+
+Implementation notes:
+- Build a reusable success receipt component/modal instead of duplicating logic
+- Generate a unique confirmation number for every finalized payment
+- Persist the confirmation/reference number in payment state/history
+- Show confirmation number clearly in the success screen and receipt summary
+
+For ACH payments:
+- If ACH payments have a realistic relevant confirmation/reference field, include it
+- If backend is mocked, create a consistent ACH reference/trace style placeholder structure
+- Show ACH-specific useful details such as:
+  - payment type = ACH
+  - confirmation/reference number
+  - payment date
+  - amount
+  - source account
+  - destination/card or bill target
+  - status
+
+For crypto payments:
+The success screen / receipt must include all important crypto transaction details such as:
+- confirmation/reference number
+- transaction ID / tx hash
+- blockchain / network used
+- asset used
+- amount sent
+- estimated or final USD equivalent
+- destination wallet/payment route
+- date and time
+- receipt-style summary
+- status
+
+Important:
+- Standard ACH and crypto flows should share the same success design language
+- But each should show the transaction details relevant to its payment type
+
+==================================================
+2. PAY TAB - SCHEDULED PAYMENTS INTERACTION CHANGE
+==================================================
+
+Current issue:
+In Scheduled Payments, users currently click the calendar for more information.
+
+What to change:
+- Move this interaction from the calendar element to the scheduled payment icon itself
+- Clicking the icon should now load the same information that the calendar currently shows
+- Make the interaction intuitive, responsive, and consistent
+- Remove any confusing duplicated click targets if needed
+
+Expected result:
+- The icon becomes the main entry point for viewing scheduled payment details
+- Information currently tied to the calendar should appear from the icon click instead
+
+==================================================
+3. CARD LIST TAB - CREDIT PROFILE LAYOUT CLEANUP
+==================================================
+
+Current issue:
+The Credit Profile section looks too bulky and wastes space.
+
+What to change:
+- Move TransUnion underneath Equifax and Experian to create a cleaner layout and free space
+- Reorganize the section so it feels more balanced and readable on screen
+- Maintain clear visual hierarchy and spacing
+
+Also fix these UI bugs in the same area:
+- “Total Cash Back” text looks off-center / buggy
+- “Rewards Points” text looks off-center / buggy
+- Subscription amount is too close to the word “Subscriptions” and feels overlapped
+
+Requirements:
+- Fix alignment, spacing, and vertical rhythm
+- Make stat labels and values look intentionally positioned
+- Ensure text containers are centered correctly and don’t jitter or overflow
+- Improve spacing between title/value/subtext layers
+- Preserve the existing design language and elevated surface feel
+
+==================================================
+4. SETTINGS TAB - ADD NOTIFICATIONS SECTION
+==================================================
+
+Add a new Notifications section/button in Settings.
+
+This should allow users to configure alerts for:
+- Due date reminders
+- Payment reminders
+- Statement balance ready
+- Email notifications
+- Text/SMS notifications
+
+Requirements:
+- Add a dedicated notifications entry point in the Settings tab
+- Inside it, create a clean premium settings module with toggles, selections, or grouped options
+- Make it easy to choose alert type and delivery channel
+- Preserve the same theme/card framework as the rest of the app
+
+Suggested structure:
+- Notification Preferences
+  - Due Date Reminder
+  - Payment Reminder
+  - Statement Balance Ready
+- Delivery Methods
+  - Email
+  - SMS/Text
+
+Keep it visually elegant and product-ready.
+
+==================================================
+5. CUSTOMIZE THEME - FIX BACKGROUND LINKING BUG + REWORK THE CONTROLS
+==================================================
+
+Current issue:
+In the Card List tab, the background is not properly linked to the Customize Theme menu.
+
+What to fix:
+- Ensure background/theme selection actually updates the visible app background correctly
+- Remove the current “one button that looks like the background” approach
+- Replace the existing theme controls with a cleaner, smaller, more flexible menu system inside the same Customize window
+
+New structure for Customize Theme:
+Replace the current options with 3 smaller style menus:
+
+A. Pastel Colors Menu
+- Curated pastel color themes
+- Soft luxury palettes
+- Clean preview swatches
+
+B. Pattern + Color Menu
+- Different pattern styles with different color combinations
+- Include more complex background patterns than the current set
+- Examples: ornamental, baroque-inspired, abstract luxury, minimal geometric, celestial, textured silk-like patterns
+- Keep them elegant and premium, not busy
+
+C. Rainbow Wheel / Custom Color Picker
+- Let the user choose the color they want for the background
+- This should integrate with the pattern/background system cleanly
+- If possible, allow the chosen color to tint the background system without breaking readability
+
+Requirements:
+- All of this must live in the same Customize Theme window
+- Make the menus smaller, cleaner, and more modular
+- Ensure the final selected theme actually applies across the relevant screens
+- Keep strong separation between decorative background and content cards
+
+Important:
+- Add more advanced/complex premium background patterns
+- Patterns must still remain subtle enough for financial UI readability
+- Theme customization must feel polished, smooth, and intentional
+
+==================================================
+6. SETTINGS TAB - ADD KYC FORM
+==================================================
+
+Add a KYC form section in Settings.
+
+Purpose:
+Users should be able to enter the important information needed for identity verification in a structured way.
+
+Requirements:
+- Add a KYC entry point/button in the Settings tab
+- Create a well-organized KYC form
+- Include the important information fields needed for proper KYC collection
+- Add a submit button at the end
+
+Suggested KYC field groups:
+- Legal name
+- Date of birth
+- Residential address
+- Phone number
+- Email
+- Country / jurisdiction
+- ID type
+- ID number
+- Expiration date
+- Tax-related field if relevant
+- Optional upload placeholders if file upload is scaffolded
+- Consent / acknowledgement section
+
+Important:
+- Build the form cleanly even if backend verification is not connected yet
+- Validate required fields
+- Make the form feel secure, serious, and readable
+- Keep the UI aligned with the premium app design
+
+==================================================
+7. CARD LIST TAB - CREDIT PROFILE INTERACTIVE DETAILS
+==================================================
+
+Add more drill-down functionality in the Credit Profile area.
+
+A. Debt Summary
+When clicking the Debt Summary button at the top-left icon area:
+- Show current debt summary
+- This can include common debt types and legal debt/loan categories where relevant
+- Present it in a clean breakdown view
+
+Possible categories:
+- Credit card debt
+- Personal loans
+- Auto loan
+- Mortgage
+- Student loan
+- Collections / legal debt if applicable
+- Other obligations
+
+B. Credit Utilization
+When clicking Credit Utilization:
+- Show the cards that ended with a balance in the closing statement
+- Display utilization-relevant information in a clean per-card breakdown
+- Make the section easy to scan
+
+C. Credit Payment History
+When clicking Credit Payment History:
+- Show a calendar of on-time payments made each month
+- Add a date wheel / date selector to move across payment history for multiple years
+- Make this interactive but easy to use
+- Keep it clean, premium, and data-readable
+
+Requirements:
+- These drill-down views should feel like part of the same Credit Profile system
+- Use consistent card/modal/detail panel styling
+- Keep the layout breathable and not cramped
+- Make sure data sections are structured and understandable
+
+==================================================
+8. ENGINEERING / BUG FIX EXPECTATIONS
+==================================================
+
+Do not just add UI. Clean up the underlying logic.
+
+Refactor as needed so that:
+- Payment success flows use shared reusable components
+- Confirmation/reference numbers are generated consistently
+- Crypto and ACH receipts use type-specific data models
+- Theme customization state is centralized and actually applied
+- Credit profile layout is responsive and cleaner
+- Scheduled payment interactions use the correct click targets
+- Notifications and KYC sections are modular and easy to extend
+
+Check and fix likely issues such as:
+- broken state bindings
+- unlinked theme background updates
+- overlapping text containers
+- poor flex/grid alignment
+- spacing inconsistencies
+- duplicated modal/success logic
+- inconsistent receipt handling
+- weak separation between decorative and functional layers
+
+==================================================
+9. UX / VISUAL RULES
+==================================================
+
+Must keep:
+- luxury purple fintech look
+- layered elevated surfaces
+- semi-opaque premium cards
+- subtle blur where appropriate
+- readable contrast
+- elegant borders and shadows
+- strong separation from textured backgrounds
+
+Must avoid:
+- flat generic admin-panel look
+- cluttered layouts
+- overlapping text
+- decorative backgrounds interfering with data
+- inconsistent success flows
+- theme controls that feel oversized or confusing
+
+==================================================
+10. FINAL DELIVERABLE EXPECTATION
+==================================================
+
+Implement this as a polished product update that:
+- unifies all payment completion alerts into one premium success system
+- adds confirmation/reference numbers for all transactions
+- shows ACH-specific and crypto-specific receipt details correctly
+- moves scheduled payment info interaction from the calendar to the icon
+- cleans up the Credit Profile layout and spacing bugs
+- adds a Notifications section in Settings
+- fixes and redesigns the Customize Theme controls with pastel, pattern, and rainbow wheel options
+- adds more complex premium background patterns
+- adds a KYC form in Settings
+- adds drill-down views for debt summary, credit utilization, and payment history
+- preserves the app’s premium visual identity while improving reliability and usability
+
+Please implement with careful refactoring, reusable components, and production-minded UI/state management rather than quick hacks.
