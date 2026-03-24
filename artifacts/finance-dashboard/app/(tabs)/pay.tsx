@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -20,8 +21,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
+import { useTheme } from "@/context/ThemeContext";
 import { TransactionItem } from "@/components/TransactionItem";
 import type { ScheduledPayment } from "@/context/FinanceContext";
+
+const BG_DAMASK = require("../../assets/images/bg-damask.png");
+const GLASS_INLINE = {
+  backdropFilter: "blur(20px) saturate(140%)",
+  boxShadow: "0px 8px 32px rgba(0,0,0,0.5), inset 0px 1px 0px rgba(180,130,255,0.12)",
+} as any;
 
 const { width } = Dimensions.get("window");
 
@@ -1666,8 +1674,11 @@ export default function PayScreen() {
     ? new Date(txCycle.year, txCycle.month, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : "All";
 
+  const { theme } = useTheme();
+
   return (
-    <LinearGradient colors={[Colors.backgroundGradientStart, Colors.backgroundGradientEnd]} style={styles.gradient}>
+    <LinearGradient colors={[theme.bgStart, theme.bgEnd]} style={styles.gradient}>
+      <Image source={BG_DAMASK} style={styles.bgTexture} resizeMode="cover" />
 
       {/* ── Full-page FlatList — everything scrolls ── */}
       <FlatList
@@ -1720,7 +1731,7 @@ export default function PayScreen() {
               </View>
 
               {/* Summary */}
-              <View style={styles.summaryRow}>
+              <View style={[styles.summaryRow, GLASS_INLINE]}>
                 <View style={styles.summaryCard}>
                   <Text style={styles.summaryLabel}>Money In</Text>
                   <Text style={[styles.summaryAmt, { color: Colors.positive }]}>+{formatCurrency(totalCredit)}</Text>
@@ -1739,7 +1750,7 @@ export default function PayScreen() {
                   {scheduledPayments.map((sp) => {
                     const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
                     return (
-                      <View key={sp.id} style={styles.scheduledCard}>
+                      <View key={sp.id} style={[styles.scheduledCard, GLASS_INLINE]}>
                         <View style={styles.scheduledTop}>
                           <Pressable
                             onPress={() => { Haptics.selectionAsync(); setSelectedPayment(sp); }}
@@ -1924,6 +1935,10 @@ export default function PayScreen() {
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
+  bgTexture: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%", height: "100%", opacity: 0.09,
+  },
   listContent: {},
   pageHeader: {
     flexDirection: "row",
@@ -1975,11 +1990,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(28,14,70,0.88)",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: "rgba(255,255,255,0.11)",
     overflow: "hidden",
+    elevation: 8,
   },
   summaryCard: {
     flex: 1,
@@ -2013,12 +2029,13 @@ const styles = StyleSheet.create({
   scheduledCard: {
     marginHorizontal: 20,
     marginBottom: 12,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(28,14,70,0.88)",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: "rgba(255,255,255,0.11)",
     padding: 16,
     gap: 10,
+    elevation: 8,
   },
   scheduledTop: {
     flexDirection: "row",

@@ -1,0 +1,65 @@
+Update the theme system so the same premium purple background treatment used in the Cards/List tab is also applied consistently to the Pay tab and the Options/Settings tab.
+
+Goal:
+Keep the original theme-switching behavior exactly as it works now, but extend the visual system across all main tabs so the app feels unified. The Pay tab and Options tab should inherit the same luxury purple design language, layered card framework, and background handling as the Cards/List tab.
+
+What I want:
+- Apply the same themed background logic from the Cards/List tab to:
+  - Pay tab
+  - Options / Settings tab
+- Keep the same framework for surfaces, spacing, layering, and card separation on every tab
+- Prevent content from blending into the wallpaper on any page
+- Add a subtle premium texture to the other pages as well, without making them noisy
+
+Design direction:
+- The background should feel consistent across tabs, as part of one unified system
+- The Pay and Options tabs should use the same luxury purple base, gradients, and decorative texture language
+- Keep the background decorative and elegant, but lower in visual priority than the content
+- Add soft ornamental texture or faint patterning behind the layout on those tabs too
+- The texture should be subtle, diffused, and upscale — not sharp, busy, or distracting
+
+Surface behavior:
+- Every main panel, list item, payment module, settings group, and info box should sit on distinct elevated surfaces
+- Use the same card treatment established previously:
+  - semi-opaque premium purple surfaces
+  - slight translucency
+  - backdrop blur
+  - subtle border
+  - soft shadow
+- Do not let the background pattern show sharply through functional UI areas
+- List rows, payment sections, toggles, settings cards, and grouped containers should all feel clearly readable
+
+Consistency requirements:
+- Reuse the same visual framework across all tabs:
+  - border radius
+  - card opacity
+  - blur level
+  - stroke style
+  - shadow depth
+  - inner highlight behavior
+  - spacing rhythm
+- Theme changes should affect all tabs consistently, not just the Cards/List tab
+- Make sure dark/light variations of the purple theme still feel coherent across every screen
+
+Texture direction for Pay and Options tabs:
+- Add very subtle texture behind the content layer, similar in spirit to the Cards/List tab
+- The texture can be a soft floral/baroque-inspired pattern, gradient grain, or elegant ornamental overlay
+- Keep it low contrast and partially faded into the background
+- It should enrich the page visually without competing with buttons, labels, amounts, or settings text
+
+Important:
+- Do not break the current theme-switching functionality
+- Do not flatten the UI into plain blocks
+- Do not let the background and the cards merge together
+- The content should always appear to live on top of the themed background, never inside it
+- Preserve the premium fintech aesthetic across every tab
+
+Recommended implementation style:
+- Centralize the themed background and surface system so all tabs share the same foundation
+- Reuse a common card/container class for the Cards, Pay, and Options screens
+- Apply the same background layer logic to each tab screen before rendering its content
+- Add subtle decorative texture overlays per screen, but keep opacity low
+- Ensure readable contrast for all important data, actions, and labels
+
+Visual result:
+The Cards/List tab, Pay tab, and Options tab should all feel like parts of the same premium app experience — same purple luxury atmosphere, same layered glass/surface treatment, same readability, and same elegant textured background system.

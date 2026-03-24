@@ -22,7 +22,14 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
+import { useTheme } from "@/context/ThemeContext";
 import type { BankAccount } from "@/context/FinanceContext";
+
+const BG_DAMASK = require("../../assets/images/bg-damask.png");
+const GLASS_INLINE = {
+  backdropFilter: "blur(20px) saturate(140%)",
+  boxShadow: "0px 8px 32px rgba(0,0,0,0.5), inset 0px 1px 0px rgba(180,130,255,0.12)",
+} as any;
 
 const CF_LOGO = require("../../assets/images/profile-logo.png");
 const SCREEN_W = Dimensions.get("window").width;
@@ -840,8 +847,11 @@ export default function OptionsScreen() {
 
   const totalCredit = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
 
+  const { theme } = useTheme();
+
   return (
-    <LinearGradient colors={[Colors.backgroundGradientStart, Colors.backgroundGradientEnd]} style={styles.gradient}>
+    <LinearGradient colors={[theme.bgStart, theme.bgEnd]} style={styles.gradient}>
+      <Image source={BG_DAMASK} style={styles.bgTexture} resizeMode="cover" />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -850,7 +860,7 @@ export default function OptionsScreen() {
         {/* Profile card — avatar is tappable */}
         <Pressable
           onPress={() => { Haptics.selectionAsync(); setProfileMenuVisible(true); }}
-          style={({ pressed }) => [styles.profileCard, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.profileCard, GLASS_INLINE, pressed && { opacity: 0.85 }]}
         >
           <View style={styles.avatar}>
             <Image
@@ -871,7 +881,7 @@ export default function OptionsScreen() {
           </View>
         </Pressable>
 
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, GLASS_INLINE]}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{cards.length}</Text>
             <Text style={styles.statLabel}>Cards</Text>
@@ -891,7 +901,7 @@ export default function OptionsScreen() {
         </View>
 
         <SectionLabel text="Account" />
-        <View style={styles.settingsGroup}>
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
           <SettingRow icon="user" label="Personal Info" subtitle={displayName} onPress={() => setPersonalInfoVisible(true)} />
           <View style={styles.rowDivider} />
           <SettingRow icon="credit-card" label="Linked Cards" value={`${cards.length} cards`} onPress={() => {}} />
@@ -900,7 +910,7 @@ export default function OptionsScreen() {
         </View>
 
         <SectionLabel text="Linked Bank Accounts" />
-        <View style={styles.settingsGroup}>
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
           {bankAccounts.map((bank, idx) => (
             <React.Fragment key={bank.id}>
               {idx > 0 && <View style={styles.rowDivider} />}
@@ -938,7 +948,7 @@ export default function OptionsScreen() {
         </View>
 
         <SectionLabel text="Security" />
-        <View style={styles.settingsGroup}>
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
           <SettingRow icon="shield" label="Biometric Auth" subtitle="Face ID / Fingerprint" toggle toggleValue={biometricEnabled} onToggle={setBiometricEnabled} />
           <View style={styles.rowDivider} />
           <SettingRow icon="lock" label="Change PIN" onPress={() => {}} />
@@ -947,14 +957,14 @@ export default function OptionsScreen() {
         </View>
 
         <SectionLabel text="Notifications" />
-        <View style={styles.settingsGroup}>
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
           <SettingRow icon="bell" label="Push Notifications" toggle toggleValue={notificationsEnabled} onToggle={setNotificationsEnabled} />
           <View style={styles.rowDivider} />
           <SettingRow icon="mail" label="Email Reports" subtitle="Weekly spending summary" onPress={() => {}} />
         </View>
 
         <SectionLabel text="Support" />
-        <View style={styles.settingsGroup}>
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
           <SettingRow icon="help-circle" label="Help Center" onPress={() => {}} />
           <View style={styles.rowDivider} />
           <SettingRow icon="message-square" label="Contact Us" onPress={() => {}} />
@@ -1002,11 +1012,16 @@ export default function OptionsScreen() {
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
+  bgTexture: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%", height: "100%", opacity: 0.09,
+  },
   scrollContent: { paddingBottom: 120, paddingHorizontal: 20 },
   profileCard: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 18,
-    padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.divider, gap: 12,
+    backgroundColor: "rgba(28,14,70,0.88)", borderRadius: 18,
+    padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.11)", gap: 12,
+    elevation: 8,
   },
   avatar: {
     width: 52, height: 52, borderRadius: 26,
@@ -1028,8 +1043,9 @@ const styles = StyleSheet.create({
   },
   premiumText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.primary },
   statsRow: {
-    flexDirection: "row", backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 16,
-    borderWidth: 1, borderColor: Colors.divider, marginBottom: 24, paddingVertical: 16,
+    flexDirection: "row", backgroundColor: "rgba(28,14,70,0.88)", borderRadius: 16,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.11)", marginBottom: 24, paddingVertical: 16,
+    elevation: 8,
   },
   statItem: { flex: 1, alignItems: "center", gap: 4 },
   statValue: { fontFamily: "Inter_700Bold", fontSize: 17, color: Colors.textPrimary },
@@ -1043,8 +1059,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 8, marginLeft: 4,
   },
   settingsGroup: {
-    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 16, borderWidth: 1,
-    borderColor: Colors.divider, marginBottom: 20, overflow: "hidden",
+    backgroundColor: "rgba(28,14,70,0.88)", borderRadius: 16, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)", marginBottom: 20, overflow: "hidden",
+    elevation: 8,
   },
   settingRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
   settingRowPressed: { backgroundColor: "rgba(255,255,255,0.04)" },
