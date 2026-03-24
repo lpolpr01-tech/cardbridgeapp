@@ -1201,28 +1201,55 @@ function CryptoScheduleModal({
 
 // ─── Crypto Main Modal ────────────────────────────────────────────────────────
 
+type SwapDir = "usdc_to_usd" | "usd_to_usdc";
+type SwapStatus = "idle" | "loading" | "success" | "error";
+
+const USDC_RATE = 1.0; // 1 USDC = $1.00 USD (scaffold; replace with live feed)
+const SWAP_FEE_PCT = 0.003; // 0.3% fee
+
 function CryptoModal({
   visible,
   onClose,
-  defaultPayAll,
-}: { visible: boolean; onClose: () => void; defaultPayAll?: boolean }) {
+  onPayAllSuccess,
+}: { visible: boolean; onClose: () => void; onPayAllSuccess?: (amt: number) => void }) {
   const { cards } = useFinance();
   const insets = useSafeAreaInsets();
   const [activeToken, setActiveToken] = useState<TokenKey>("btc");
-  const [sendVisible, setSendVisible] = useState(false);
   const [sendAddr, setSendAddr] = useState("");
   const [sendAmt, setSendAmt] = useState("");
   const [scheduleVisible, setScheduleVisible] = useState(false);
-  const [view, setView] = useState<"main" | "send" | "receive">("main");
+  const [view, setView] = useState<"main" | "send" | "receive" | "swap">("main");
+
+  // Copy feedback — no Alert (Alert can freeze modal state)
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Swap state
+  const [swapDir, setSwapDir] = useState<SwapDir>("usdc_to_usd");
+  const [swapAmt, setSwapAmt] = useState("");
+  const [swapStatus, setSwapStatus] = useState<SwapStatus>("idle");
 
   const token = CRYPTO_TOKENS[activeToken];
   const usdValue = token.balance * token.usdPrice;
-
   const allTokens: TokenKey[] = ["btc", "eth", "sol"];
+
+  // Reset all local state when closing — prevents stale state freeze
+  const handleClose = () => {
+    setView("main");
+    setSendAddr("");
+    setSendAmt("");
+    setCopied(false);
+    setSwapAmt("");
+    setSwapStatus("idle");
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    onClose();
+  };
 
   const handleCopyAddress = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Copied", "Wallet address copied to clipboard.");
+    setCopied(true);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 2200);
   };
 
   const handleSend = () => {
@@ -1238,9 +1265,36 @@ function CryptoModal({
     );
   };
 
+  // Swap logic
+  const swapNum = parseFloat(swapAmt) || 0;
+  const swapFee = swapNum * SWAP_FEE_PCT;
+  const swapReceived = swapDir === "usdc_to_usd"
+    ? (swapNum - swapFee) * USDC_RATE
+    : (swapNum - swapFee) / USDC_RATE;
+  const swapFromLabel = swapDir === "usdc_to_usd" ? "USDC" : "USD";
+  const swapToLabel   = swapDir === "usdc_to_usd" ? "USD"  : "USDC";
+
+  const handleSwap = () => {
+    if (swapNum <= 0) {
+      Alert.alert("Invalid Amount", "Enter an amount greater than zero.");
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSwapStatus("loading");
+    setTimeout(() => {
+      setSwapStatus("success");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }, 1400);
+  };
+
+  const resetSwap = () => {
+    setSwapAmt("");
+    setSwapStatus("idle");
+  };
+
   return (
     <>
-      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
         <View style={cry.overlay}>
           <View style={[cry.sheet, { paddingBottom: insets.bottom + 20 }]}>
             <View style={cry.handle} />
@@ -1255,7 +1309,7 @@ function CryptoModal({
               ) : (
                 <Text style={cry.title}>Crypto Wallet</Text>
               )}
-              <Pressable onPress={onClose} style={cry.closeBtn}>
+              <Pressable onPress={handleClose} style={cry.closeBtn}>
                 <Feather name="x" size={20} color={Colors.textSecondary} />
               </Pressable>
             </View>
@@ -1317,10 +1371,17 @@ function CryptoModal({
                       <Text style={cry.addressText} numberOfLines={1} ellipsizeMode="middle">
                         {token.address}
                       </Text>
-                      <Pressable onPress={handleCopyAddress} style={cry.copyBtn}>
-                        <Feather name="copy" size={14} color={Colors.primary} />
+                      <Pressable onPress={handleCopyAddress} style={[cry.copyBtn, copied && { backgroundColor: "rgba(74,222,170,0.18)" }]}>
+                        {copied
+                          ? <Feather name="check" size={14} color={Colors.positive} />
+                          : <Feather name="copy" size={14} color={Colors.primary} />}
                       </Pressable>
                     </View>
+                    {copied && (
+                      <Text style={{ fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.positive, marginTop: 4, marginLeft: 2 }}>
+                        Copied to clipboard
+                      </Text>
+                    )}
                   </View>
 
                   {/* All token summary */}
@@ -1367,6 +1428,13 @@ function CryptoModal({
                     >
                       <Feather name="arrow-down-left" size={18} color={token.color} />
                       <Text style={[cry.actionBtnText, { color: token.color }]}>Receive</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); resetSwap(); setView("swap"); }}
+                      style={[cry.actionBtn, { borderColor: "rgba(108,158,255,0.44)", backgroundColor: "rgba(108,158,255,0.08)" }]}
+                    >
+                      <Feather name="refresh-cw" size={18} color={Colors.primary} />
+                      <Text style={[cry.actionBtnText, { color: Colors.primary }]}>Swap</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScheduleVisible(true); }}
@@ -1467,9 +1535,16 @@ function CryptoModal({
                   <View style={cry.receiveAddrBox}>
                     <Text style={cry.receiveAddr}>{token.address}</Text>
                   </View>
-                  <Pressable onPress={handleCopyAddress} style={cry.copyAddrBtn}>
-                    <Feather name="copy" size={15} color={Colors.primary} />
-                    <Text style={cry.copyAddrText}>Copy Address</Text>
+                  <Pressable
+                    onPress={handleCopyAddress}
+                    style={[cry.copyAddrBtn, copied && { backgroundColor: "rgba(74,222,170,0.15)", borderColor: "rgba(74,222,170,0.4)" }]}
+                  >
+                    {copied
+                      ? <Feather name="check" size={15} color={Colors.positive} />
+                      : <Feather name="copy" size={15} color={Colors.primary} />}
+                    <Text style={[cry.copyAddrText, copied && { color: Colors.positive }]}>
+                      {copied ? "Copied!" : "Copy Address"}
+                    </Text>
                   </Pressable>
 
                   <View style={cry.sendWarning}>
@@ -1478,6 +1553,120 @@ function CryptoModal({
                       Only send {token.symbol} on the {token.network}. Sending other assets may result in permanent loss.
                     </Text>
                   </View>
+                </>
+              )}
+
+              {view === "swap" && (
+                <>
+                  {/* Swap header card */}
+                  <LinearGradient
+                    colors={["rgba(108,158,255,0.18)", "rgba(79,127,255,0.08)"]}
+                    style={cry.swapHeader}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  >
+                    <Feather name="refresh-cw" size={22} color={Colors.primary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={cry.swapHeaderTitle}>USDC ↔ USD Swap</Text>
+                      <Text style={cry.swapHeaderSub}>Convert between stablecoin and cash</Text>
+                    </View>
+                  </LinearGradient>
+
+                  {/* Direction toggle */}
+                  <Text style={cry.sendLabel}>Direction</Text>
+                  <View style={cry.swapDirRow}>
+                    <Pressable
+                      onPress={() => { Haptics.selectionAsync(); setSwapDir("usdc_to_usd"); resetSwap(); }}
+                      style={[cry.swapDirBtn, swapDir === "usdc_to_usd" && cry.swapDirBtnActive]}
+                    >
+                      <Text style={[cry.swapDirText, swapDir === "usdc_to_usd" && cry.swapDirTextActive]}>USDC → USD</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { Haptics.selectionAsync(); setSwapDir("usd_to_usdc"); resetSwap(); }}
+                      style={[cry.swapDirBtn, swapDir === "usd_to_usdc" && cry.swapDirBtnActive]}
+                    >
+                      <Text style={[cry.swapDirText, swapDir === "usd_to_usdc" && cry.swapDirTextActive]}>USD → USDC</Text>
+                    </Pressable>
+                  </View>
+
+                  {swapStatus === "success" ? (
+                    <View style={cry.swapSuccess}>
+                      <Feather name="check-circle" size={36} color={Colors.positive} />
+                      <Text style={cry.swapSuccessTitle}>Swap Complete!</Text>
+                      <Text style={cry.swapSuccessAmt}>
+                        {formatCurrency(swapNum)} {swapFromLabel} → {formatCurrency(swapReceived)} {swapToLabel}
+                      </Text>
+                      <Text style={cry.swapSuccessSub}>
+                        Funds will appear in your {swapToLabel === "USD" ? "bank account" : "USDC wallet"} within 1 business day.
+                      </Text>
+                      <Pressable
+                        onPress={() => { resetSwap(); setView("main"); }}
+                        style={cry.swapDoneBtn}
+                      >
+                        <Text style={cry.swapDoneBtnText}>Done</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <>
+                      {/* Amount input */}
+                      <Text style={cry.sendLabel}>You Send ({swapFromLabel})</Text>
+                      <View style={cry.swapInputRow}>
+                        <Text style={cry.swapCurrLabel}>{swapFromLabel}</Text>
+                        <TextInput
+                          style={[cry.sendInput, { flex: 1, marginBottom: 0 }]}
+                          value={swapAmt}
+                          onChangeText={(v) => { setSwapAmt(v); setSwapStatus("idle"); }}
+                          placeholder="0.00"
+                          placeholderTextColor={Colors.textMuted}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+
+                      {/* Conversion summary */}
+                      {swapNum > 0 && (
+                        <View style={cry.swapSummary}>
+                          <View style={cry.swapSummaryRow}>
+                            <Text style={cry.swapSummaryLabel}>You Receive</Text>
+                            <Text style={[cry.swapSummaryVal, { color: Colors.positive }]}>
+                              {formatCurrency(swapReceived)} {swapToLabel}
+                            </Text>
+                          </View>
+                          <View style={cry.swapSummaryRow}>
+                            <Text style={cry.swapSummaryLabel}>Network Fee (0.3%)</Text>
+                            <Text style={cry.swapSummaryVal}>{formatCurrency(swapFee)} {swapFromLabel}</Text>
+                          </View>
+                          <View style={cry.swapSummaryRow}>
+                            <Text style={cry.swapSummaryLabel}>Rate</Text>
+                            <Text style={cry.swapSummaryVal}>1 USDC = {formatCurrency(USDC_RATE)} USD</Text>
+                          </View>
+                        </View>
+                      )}
+
+                      <View style={cry.sendWarning}>
+                        <Feather name="info" size={14} color={Colors.primary} />
+                        <Text style={cry.sendWarningText}>
+                          Swaps are processed via Circle's USDC settlement network. USD arrives via ACH within 1 business day. Rates are locked at time of submission.
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        onPress={handleSwap}
+                        style={({ pressed }) => [cry.sendBtn, { backgroundColor: swapStatus === "loading" ? Colors.textMuted : Colors.primaryDark }, pressed && { opacity: 0.8 }]}
+                        disabled={swapStatus === "loading"}
+                      >
+                        {swapStatus === "loading" ? (
+                          <>
+                            <Feather name="loader" size={16} color="#fff" />
+                            <Text style={cry.sendBtnText}>Processing…</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Feather name="refresh-cw" size={16} color="#fff" />
+                            <Text style={cry.sendBtnText}>Confirm Swap</Text>
+                          </>
+                        )}
+                      </Pressable>
+                    </>
+                  )}
                 </>
               )}
             </ScrollView>
@@ -1585,19 +1774,501 @@ const tcp = StyleSheet.create({
   chipTextActive: { color: Colors.primary, fontFamily: "Inter_600SemiBold" },
 });
 
+// ─── Confetti Overlay ─────────────────────────────────────────────────────────
+
+const CONFETTI_COLORS = ["#9B5CF5", "#6C9EFF", "#4ADEAA", "#FF6B8A", "#F59E0B", "#fff"];
+const PARTICLE_COUNT = 28;
+
+type ConfettiParticle = {
+  x: Animated.Value;
+  y: Animated.Value;
+  opacity: Animated.Value;
+  rotate: Animated.Value;
+  color: string;
+  size: number;
+  startX: number;
+};
+
+function ConfettiOverlay({ visible, onDone }: { visible: boolean; onDone: () => void }) {
+  const { width: W, height: H } = Dimensions.get("window");
+  const particles = useRef<ConfettiParticle[]>(
+    Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      rotate: new Animated.Value(0),
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size: 6 + Math.random() * 8,
+      startX: (i / PARTICLE_COUNT) * W,
+    }))
+  ).current;
+
+  React.useEffect(() => {
+    if (!visible) return;
+    particles.forEach((p) => {
+      p.x.setValue(0);
+      p.y.setValue(0);
+      p.opacity.setValue(1);
+      p.rotate.setValue(0);
+    });
+    const anims = particles.map((p) =>
+      Animated.parallel([
+        Animated.timing(p.x, {
+          toValue: (Math.random() - 0.5) * 160,
+          duration: 1400 + Math.random() * 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.y, {
+          toValue: H * 0.6 + Math.random() * H * 0.3,
+          duration: 1400 + Math.random() * 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.rotate, {
+          toValue: (Math.random() - 0.5) * 720,
+          duration: 1400 + Math.random() * 400,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(800),
+          Animated.timing(p.opacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ]),
+      ])
+    );
+    Animated.parallel(anims).start();
+    const t = setTimeout(onDone, 2400);
+    return () => clearTimeout(t);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <View style={[confSt.wrap, { pointerEvents: "none" } as any]}>
+      {particles.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            confSt.particle,
+            {
+              width: p.size,
+              height: p.size,
+              borderRadius: p.size / 2,
+              backgroundColor: p.color,
+              left: p.startX,
+              top: "35%",
+              opacity: p.opacity,
+              transform: [
+                { translateX: p.x },
+                { translateY: p.y },
+                { rotate: p.rotate.interpolate({ inputRange: [-720, 720], outputRange: ["-720deg", "720deg"] }) },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const confSt = StyleSheet.create({
+  wrap: { ...StyleSheet.absoluteFillObject, zIndex: 999 },
+  particle: { position: "absolute" },
+});
+
+// ─── Pay Success Overlay ───────────────────────────────────────────────────────
+
+type PaySuccessType = "ach" | "crypto";
+
+function PaySuccessOverlay({
+  visible,
+  type,
+  amount,
+  onDone,
+}: { visible: boolean; type: PaySuccessType; amount: number; onDone: () => void }) {
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (!visible) {
+      scaleAnim.setValue(0);
+      fadeAnim.setValue(0);
+      return;
+    }
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 120 }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+    ]).start();
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const msg = type === "ach"
+    ? "Payment sent via ACH. Funds arrive within 1–4 business days."
+    : "Crypto payment queued. Conversion and ACH transfer will process on the scheduled date.";
+  const title = type === "ach" ? "Payments Submitted!" : "Crypto Payment Queued!";
+
+  return (
+    <View style={[pSucc.backdrop, { pointerEvents: "box-none" } as any]}>
+      <Animated.View style={[pSucc.card, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+        <View style={pSucc.iconWrap}>
+          <Feather name="check-circle" size={40} color={Colors.positive} />
+        </View>
+        <Text style={pSucc.title}>{title}</Text>
+        <Text style={pSucc.amount}>{formatCurrency(amount)}</Text>
+        <Text style={pSucc.msg}>{msg}</Text>
+        <Pressable
+          onPress={onDone}
+          style={({ pressed }) => [pSucc.doneBtn, pressed && { opacity: 0.85 }]}
+        >
+          <LinearGradient
+            colors={["#7C3AED", "#4F7FFF"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={pSucc.doneBtnGrad}
+          >
+            <Text style={pSucc.doneBtnText}>Done</Text>
+          </LinearGradient>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
+const pSucc = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 998,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    backgroundColor: "#0E0828",
+    borderRadius: 28,
+    padding: 32,
+    alignItems: "center",
+    gap: 14,
+    marginHorizontal: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    shadowColor: "#9B5CF5",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "rgba(74,222,170,0.14)",
+    borderWidth: 1.5,
+    borderColor: "rgba(74,222,170,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  title: { fontFamily: "Inter_700Bold", fontSize: 22, color: Colors.textPrimary, textAlign: "center" },
+  amount: { fontFamily: "Inter_700Bold", fontSize: 32, color: Colors.positive, letterSpacing: -0.5 },
+  msg: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, textAlign: "center", lineHeight: 20, paddingHorizontal: 8 },
+  doneBtn: { borderRadius: 14, overflow: "hidden", marginTop: 8, width: "100%" },
+  doneBtnGrad: { paddingVertical: 15, alignItems: "center" },
+  doneBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+});
+
+// ─── Pay All Preview Modal (ACH) ──────────────────────────────────────────────
+
+type PayAllPreviewProps = {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  cards: { id: string; name: string; lastFour: string; balance: number }[];
+  totalAmount: number;
+};
+
+function PayAllPreviewModal({ visible, onClose, onConfirm, cards: cardList, totalAmount }: PayAllPreviewProps) {
+  const insets = useSafeAreaInsets();
+  const today = new Date();
+  const nextBillingDate = new Date(today);
+  nextBillingDate.setDate(today.getDate() + ((15 - today.getDate() + 30) % 30 || 30));
+  const settlementDate = addBusinessDays(nextBillingDate, 3);
+
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={prev.overlay}>
+        <View style={[prev.sheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={prev.handle} />
+          <View style={prev.header}>
+            <Text style={prev.title}>Payment Preview</Text>
+            <Pressable onPress={onClose} style={prev.closeBtn}>
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Amount hero */}
+            <View style={prev.amtHero}>
+              <Text style={prev.amtLabel}>Total Payment</Text>
+              <Text style={prev.amtValue}>{formatCurrency(totalAmount)}</Text>
+              <View style={prev.typePill}>
+                <Feather name="credit-card" size={12} color={Colors.primary} />
+                <Text style={prev.typePillText}>ACH Bank Transfer</Text>
+              </View>
+            </View>
+
+            {/* Date + timing block */}
+            <View style={prev.dateBlock}>
+              <View style={prev.dateRow}>
+                <Feather name="calendar" size={15} color={Colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={prev.dateLabel}>Payment Date</Text>
+                  <Text style={prev.dateVal}>{fmt(nextBillingDate)}</Text>
+                </View>
+              </View>
+              <View style={prev.dateDivider} />
+              <View style={prev.dateRow}>
+                <Feather name="clock" size={15} color="#F59E0B" />
+                <View style={{ flex: 1 }}>
+                  <Text style={prev.dateLabel}>Estimated Settlement</Text>
+                  <Text style={[prev.dateVal, { color: "#F59E0B" }]}>By {fmt(settlementDate)}</Text>
+                  <Text style={prev.dateSub}>1–4 business days via ACH</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Cards breakdown */}
+            <Text style={prev.sectionLabel}>Cards Included</Text>
+            <View style={prev.cardsList}>
+              {cardList.map((c) => (
+                <View key={c.id} style={prev.cardRow}>
+                  <View style={[prev.cardDot, { backgroundColor: CARD_COLORS[c.id] || Colors.primary }]} />
+                  <Text style={prev.cardName}>{c.name} ···{c.lastFour}</Text>
+                  <Text style={prev.cardAmt}>{formatCurrency(c.balance)}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Source */}
+            <Text style={prev.sectionLabel}>Payment Source</Text>
+            <View style={prev.sourceRow}>
+              <Feather name="database" size={15} color={Colors.positive} />
+              <Text style={prev.sourceText}>Chase Bank · Checking ···8842 (Primary)</Text>
+            </View>
+
+            {/* Notice */}
+            <View style={prev.noticeBanner}>
+              <Feather name="info" size={14} color={Colors.primary} />
+              <Text style={prev.noticeText}>
+                By confirming, you authorize CardFlow to initiate an ACH debit from your linked bank account. Payments cannot be cancelled once processing begins.
+              </Text>
+            </View>
+
+            {/* Action buttons */}
+            <Pressable
+              onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onConfirm(); onClose(); }}
+              style={({ pressed }) => [prev.confirmBtn, pressed && { opacity: 0.85 }]}
+            >
+              <LinearGradient
+                colors={[Colors.primaryDark, "#6C9EFF"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={prev.confirmBtnGrad}
+              >
+                <Feather name="zap" size={16} color="#fff" />
+                <Text style={prev.confirmBtnText}>Confirm Pay All — {formatCurrency(totalAmount)}</Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable onPress={onClose} style={({ pressed }) => [prev.cancelBtn, pressed && { opacity: 0.7 }]}>
+              <Text style={prev.cancelBtnText}>Cancel</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Crypto Pay All Preview Modal ─────────────────────────────────────────────
+
+type CryptoPayAllPreviewProps = {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  totalUsd: number;
+};
+
+function CryptoPayAllPreviewModal({ visible, onClose, onConfirm, totalUsd }: CryptoPayAllPreviewProps) {
+  const insets = useSafeAreaInsets();
+  const today = new Date();
+  const execDate = addBusinessDays(today, 1);
+  const settlementDate = addBusinessDays(execDate, 3);
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const totalCrypto = Object.values(CRYPTO_TOKENS).reduce((s, t) => s + t.balance * t.usdPrice, 0);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={prev.overlay}>
+        <View style={[prev.sheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={prev.handle} />
+          <View style={prev.header}>
+            <Text style={prev.title}>Crypto Payment Preview</Text>
+            <Pressable onPress={onClose} style={prev.closeBtn}>
+              <Feather name="x" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Amount hero */}
+            <View style={prev.amtHero}>
+              <Text style={prev.amtLabel}>Total Crypto Portfolio Value</Text>
+              <Text style={prev.amtValue}>{formatCurrency(totalCrypto)}</Text>
+              <View style={[prev.typePill, { backgroundColor: "rgba(153,69,255,0.15)", borderColor: "rgba(153,69,255,0.35)" }]}>
+                <Text style={{ fontSize: 12, marginRight: 4 }}>₿ Ξ ◎</Text>
+                <Text style={[prev.typePillText, { color: "#9945FF" }]}>Crypto → USD Conversion</Text>
+              </View>
+            </View>
+
+            {/* Tokens breakdown */}
+            <Text style={prev.sectionLabel}>Wallets</Text>
+            <View style={prev.cardsList}>
+              {(["btc", "eth", "sol"] as TokenKey[]).map((tk) => {
+                const t = CRYPTO_TOKENS[tk];
+                const val = t.balance * t.usdPrice;
+                const gas = GAS_FEES[tk];
+                return (
+                  <View key={tk} style={prev.cardRow}>
+                    <Text style={[prev.cardDot as any, { color: t.color, fontSize: 16, width: 8 }]}>{t.logo}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={prev.cardName}>{t.name} ({t.balance} {t.symbol})</Text>
+                      <Text style={[prev.dateSub, { marginTop: 2 }]}>Gas: ${gas.usd.toFixed(3)} · {gas.level}</Text>
+                    </View>
+                    <Text style={prev.cardAmt}>{formatCurrency(val)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Date + timing */}
+            <View style={prev.dateBlock}>
+              <View style={prev.dateRow}>
+                <Feather name="calendar" size={15} color="#9945FF" />
+                <View style={{ flex: 1 }}>
+                  <Text style={prev.dateLabel}>Conversion Date</Text>
+                  <Text style={[prev.dateVal, { color: "#9945FF" }]}>{fmt(execDate)}</Text>
+                </View>
+              </View>
+              <View style={prev.dateDivider} />
+              <View style={prev.dateRow}>
+                <Feather name="clock" size={15} color="#F59E0B" />
+                <View style={{ flex: 1 }}>
+                  <Text style={prev.dateLabel}>USD Available By</Text>
+                  <Text style={[prev.dateVal, { color: "#F59E0B" }]}>{fmt(settlementDate)}</Text>
+                  <Text style={prev.dateSub}>Swap → ACH settlement: 3–5 business days</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={prev.noticeBanner}>
+              <Feather name="alert-triangle" size={14} color="#F59E0B" />
+              <Text style={prev.noticeText}>
+                Crypto is converted to USD at market rate at time of execution. Gas fees apply per network. Transactions are irreversible.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onConfirm(); onClose(); }}
+              style={({ pressed }) => [prev.confirmBtn, pressed && { opacity: 0.85 }]}
+            >
+              <LinearGradient
+                colors={["#7C3AED", "#9945FF"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={prev.confirmBtnGrad}
+              >
+                <Text style={{ fontSize: 16, marginRight: 4 }}>₿</Text>
+                <Text style={prev.confirmBtnText}>Confirm Crypto Pay All</Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable onPress={onClose} style={({ pressed }) => [prev.cancelBtn, pressed && { opacity: 0.7 }]}>
+              <Text style={prev.cancelBtnText}>Cancel</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const prev = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#0E0828",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "90%",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  handle: { width: 40, height: 4, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 2, alignSelf: "center", marginBottom: 14 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  title: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.textPrimary },
+  closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+  amtHero: { alignItems: "center", paddingVertical: 20, gap: 8, marginBottom: 8 },
+  amtLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 },
+  amtValue: { fontFamily: "Inter_700Bold", fontSize: 36, color: Colors.textPrimary, letterSpacing: -1 },
+  typePill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(108,158,255,0.14)", borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderWidth: 1, borderColor: "rgba(108,158,255,0.3)",
+  },
+  typePillText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.primary },
+  dateBlock: {
+    backgroundColor: "rgba(28,14,70,0.85)", borderRadius: 16,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.11)",
+    padding: 16, marginBottom: 20, gap: 14,
+  },
+  dateRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  dateDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 },
+  dateLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3 },
+  dateVal: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.textPrimary },
+  dateSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 },
+  cardsList: { backgroundColor: "rgba(28,14,70,0.85)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", padding: 4, marginBottom: 20, gap: 2 },
+  cardRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12 },
+  cardDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  cardName: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
+  cardAmt: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textPrimary },
+  sourceRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(74,222,170,0.08)", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "rgba(74,222,170,0.2)", marginBottom: 20 },
+  sourceText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  noticeBanner: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: "rgba(108,158,255,0.08)", borderRadius: 12, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: "rgba(108,158,255,0.2)" },
+  noticeText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  confirmBtn: { borderRadius: 16, overflow: "hidden", marginBottom: 10, shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
+  confirmBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 17, gap: 8 },
+  confirmBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+  cancelBtn: { alignItems: "center", paddingVertical: 14 },
+  cancelBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textMuted },
+});
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function PayScreen() {
   const { transactions, cards, scheduledPayments, totalBalance } = useFinance();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>("All");
-  const [scheduleVisible, setScheduleVisible]   = useState(false);
-  const [calendarVisible, setCalendarVisible]   = useState(false);
-  const [cryptoVisible, setCryptoVisible]       = useState(false);
-  const [selectedPayment, setSelectedPayment]   = useState<ScheduledPayment | null>(null);
-  const [txMode, setTxMode]                     = useState(false);
-  const [txCycleVisible, setTxCycleVisible]     = useState(false);
-  const [txCycle, setTxCycle]                   = useState<{ year: number; month: number } | null>(null);
+  const [scheduleVisible, setScheduleVisible]           = useState(false);
+  const [calendarVisible, setCalendarVisible]           = useState(false);
+  const [cryptoVisible, setCryptoVisible]               = useState(false);
+  const [selectedPayment, setSelectedPayment]           = useState<ScheduledPayment | null>(null);
+  const [txMode, setTxMode]                             = useState(false);
+  const [txCycleVisible, setTxCycleVisible]             = useState(false);
+  const [txCycle, setTxCycle]                           = useState<{ year: number; month: number } | null>(null);
+  const [payAllPreviewVisible, setPayAllPreviewVisible] = useState(false);
+  const [cryptoPreviewVisible, setCryptoPreviewVisible] = useState(false);
+  const [successVisible, setSuccessVisible]             = useState(false);
+  const [successType, setSuccessType]                   = useState<PaySuccessType>("ach");
+  const [successAmount, setSuccessAmount]               = useState(0);
+  const [confettiVisible, setConfettiVisible]           = useState(false);
 
   // Scroll tracking
   const listRef = useRef<FlatList<any>>(null);
@@ -1629,13 +2300,24 @@ export default function PayScreen() {
   const totalDebit  = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0), [transactions]);
   const totalCredit = useMemo(() => transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0), [transactions]);
 
+  const triggerSuccess = (type: PaySuccessType, amount: number) => {
+    setSuccessType(type);
+    setSuccessAmount(amount);
+    setConfettiVisible(true);
+    setTimeout(() => {
+      setConfettiVisible(false);
+      setSuccessVisible(true);
+    }, 800);
+  };
+
   const handlePayAll = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      "Pay All Cards",
-      `Pay all ${cards.length} cards totaling ${formatCurrency(totalBalance)} on the next billing date?`,
-      [{ text: "Cancel", style: "cancel" }, { text: "Confirm", style: "default", onPress: () => {} }]
-    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPayAllPreviewVisible(true);
+  };
+
+  const handleCryptoPayAll = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCryptoPreviewVisible(true);
   };
 
   const updateScrollbar = useCallback((y: number) => {
@@ -1839,7 +2521,7 @@ export default function PayScreen() {
                     </View>
                     <Text style={styles.actionIconLabel}>Crypto</Text>
                     <Pressable
-                      onPress={(e) => { e.stopPropagation(); setCryptoVisible(true); }}
+                      onPress={(e) => { e.stopPropagation(); handleCryptoPayAll(); }}
                       style={[styles.payAllPill, { backgroundColor: "rgba(153,69,255,0.15)", borderColor: "rgba(153,69,255,0.4)" }]}
                     >
                       <Text style={[styles.payAllPillText, { color: "#9945FF" }]}>Pay All</Text>
@@ -1920,12 +2602,33 @@ export default function PayScreen() {
       <CryptoModal
         visible={cryptoVisible}
         onClose={() => setCryptoVisible(false)}
+        onPayAllSuccess={(amt) => { setCryptoVisible(false); triggerSuccess("crypto", amt); }}
       />
       <TxCyclePickerModal
         visible={txCycleVisible}
         selected={txCycle}
         onSelect={setTxCycle}
         onClose={() => setTxCycleVisible(false)}
+      />
+      <PayAllPreviewModal
+        visible={payAllPreviewVisible}
+        onClose={() => setPayAllPreviewVisible(false)}
+        onConfirm={() => triggerSuccess("ach", totalBalance)}
+        cards={cards}
+        totalAmount={totalBalance}
+      />
+      <CryptoPayAllPreviewModal
+        visible={cryptoPreviewVisible}
+        onClose={() => setCryptoPreviewVisible(false)}
+        onConfirm={() => triggerSuccess("crypto", Object.values(CRYPTO_TOKENS).reduce((s, t) => s + t.balance * t.usdPrice, 0))}
+        totalUsd={Object.values(CRYPTO_TOKENS).reduce((s, t) => s + t.balance * t.usdPrice, 0)}
+      />
+      <ConfettiOverlay visible={confettiVisible} onDone={() => setConfettiVisible(false)} />
+      <PaySuccessOverlay
+        visible={successVisible}
+        type={successType}
+        amount={successAmount}
+        onDone={() => setSuccessVisible(false)}
       />
     </LinearGradient>
   );
@@ -3887,5 +4590,132 @@ const cry = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: Colors.primary,
+  },
+  swapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "rgba(108,158,255,0.2)",
+  },
+  swapHeaderTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  swapHeaderSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  swapDirRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 4,
+  },
+  swapDirBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  swapDirBtnActive: {
+    borderColor: "rgba(108,158,255,0.5)",
+    backgroundColor: "rgba(108,158,255,0.12)",
+  },
+  swapDirText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  swapDirTextActive: {
+    color: Colors.primary,
+  },
+  swapInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 4,
+  },
+  swapCurrLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textMuted,
+    paddingRight: 8,
+    borderRightWidth: 1,
+    borderRightColor: Colors.divider,
+  },
+  swapSummary: {
+    backgroundColor: "rgba(28,14,70,0.85)",
+    borderRadius: 14,
+    padding: 16,
+    gap: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)",
+    marginBottom: 4,
+  },
+  swapSummaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  swapSummaryLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  swapSummaryVal: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  swapSuccess: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 14,
+  },
+  swapSuccessTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: Colors.positive,
+  },
+  swapSuccessAmt: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  swapSuccessSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
+  swapDoneBtn: {
+    marginTop: 8,
+    backgroundColor: Colors.primaryDark,
+    borderRadius: 14,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+  },
+  swapDoneBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
   },
 });

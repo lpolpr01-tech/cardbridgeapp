@@ -1,0 +1,128 @@
+Update the Pay flow to fix the current bugs and add the new wallet/payment features without breaking the existing UI style or theme system.
+
+Main goals:
+1. Add a USDC ↔ USD swap option
+2. Fix the Pay tab freeze bug after copying a crypto address and closing the modal
+3. Add a payment preview with date/time before confirming Pay All
+4. Reuse the same premium confirmation flow, button styling, and celebration behavior for both Pay All actions according to their function
+
+Feature 1: Add USDC ↔ USD swap
+I want users to be able to move between USDC and USD in both directions:
+- USDC to USD
+- USD to USDC
+
+Purpose:
+If a user wants to move funds back out to their CEX or DEX, they should be able to convert and withdraw accordingly.
+
+Requirements:
+- Add a clean swap module in the wallet/payment area
+- Let users choose direction:
+  - USDC → USD
+  - USD → USDC
+- Show:
+  - asset selected
+  - amount entered
+  - estimated received amount
+  - fees if applicable
+  - conversion summary
+- Keep the UI simple, premium, and consistent with the rest of the app
+- Make the swap feel like part of the same CardFlow payment ecosystem
+- Match the existing purple luxury design language
+- Use the same surface/card framework so it does not blend into the background
+
+Behavior:
+- Validate amount inputs
+- Prevent negative, zero, or unavailable balance actions
+- Show loading / pending / success / failed states cleanly
+- Make success feedback clear when swap completes
+- If backend logic is not yet connected, scaffold the UI and state management cleanly for future integration
+
+Feature 2: Fix Pay tab freeze bug
+Current bug:
+When the user clicks the crypto payment option for Pay All, copies a BTC / ETH / SOL wallet address, and then clicks the X to close that page or modal, the entire Pay tab freezes and becomes unusable until the app refreshes.
+
+Fix this completely.
+
+Expected behavior:
+- Copying the address should not break the modal state
+- Closing the crypto payment screen after copying should always return the user to a fully interactive Pay tab
+- All buttons, scroll, inputs, and tab navigation should remain responsive
+- Reset any stuck overlay, modal, pointer-events, focus lock, body scroll lock, or stale state that may be causing the freeze
+
+Please check for likely causes such as:
+- modal overlay not being removed
+- invisible layer blocking interaction
+- locked state after copy action
+- state update race condition after clipboard copy
+- uncleaned event listeners
+- animation or transition not completing
+- focus trap not releasing
+- disabled tab state not resetting
+
+Implementation expectation:
+- Make modal open/close lifecycle reliable
+- Ensure copy-to-clipboard logic is isolated and does not interfere with modal dismissal
+- On close, clean up all temporary UI state
+- Confirm the Pay tab remains usable after repeated open/copy/close cycles
+
+Feature 3: Add payment preview with date
+Before executing Pay All, add a payment preview screen/modal.
+
+The preview should show:
+- payment type
+- total amount being paid
+- source used
+- destination / bill target
+- scheduled payment date
+- estimated processing timing if applicable
+- a clear confirmation section
+
+Purpose:
+I want users to verify that Pay All is being done at the correct time and with the correct details before confirming.
+
+Requirements:
+- Add a date display on the preview
+- If scheduled or simulated timing exists, show that clearly
+- Make the preview feel trustworthy, polished, and financial-app quality
+- Use the same premium styling as the rest of the Pay flow
+- Keep strong readability and separation from the textured background
+
+Feature 4: Match confirmation flow for both Pay All paths
+I want the payment preview and confirmation behavior to feel consistent across both Pay All buttons, while still respecting their corresponding function.
+
+Requirements:
+- Use the same button color/style on the preview confirm action as the existing Pay All button
+- Reuse the same congratulations queue / success state / confirmation feeling
+- Reuse the confetti celebration for both Pay All flows
+- Each Pay All path should trigger its own correct logic and message, but visually they should feel part of the same system
+
+Examples:
+- Standard Pay All should show its own correct confirmation content
+- Crypto Pay All should show its own correct confirmation content
+- Both should share:
+  - same quality of animation
+  - same premium button treatment
+  - same success feedback system
+  - same celebratory confetti moment
+
+UI/UX consistency requirements:
+- Do not break the current theme system
+- Do not remove the luxury purple styling
+- Keep cards/panels elevated from the textured background
+- Reuse the same design system already established for surfaces, blur, borders, and shadows
+- All new modules should feel native to the app, not bolted on
+
+Engineering expectations:
+- Refactor duplicated Pay All logic into shared reusable components where appropriate
+- Separate visual confirmation flow from payment execution logic
+- Make modal/dialog state transitions robust
+- Add defensive state cleanup on close/unmount
+- Make copy, close, preview, confirm, and success flows reliable even after repeated use
+- Ensure both Pay All flows are testable and do not interfere with each other
+
+Please implement this as a polished product update:
+- bug fix for the frozen Pay tab
+- new USDC/USD swap feature
+- payment preview with date
+- unified confirmation/success/confetti flow for both Pay All actions
+- all while preserving the premium fintech UI and existing theme behavior
