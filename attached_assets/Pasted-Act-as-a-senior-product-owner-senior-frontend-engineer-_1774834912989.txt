@@ -1,0 +1,285 @@
+Act as a senior product owner, senior frontend engineer, and senior mobile UI/UX specialist working inside this existing fintech app codebase. Your job is to implement and debug the requested features with production-quality polish, while preserving the app’s premium purple luxury fintech look and making the screen fit properly on mobile devices.
+
+IMPORTANT:
+- Do not redesign the entire app.
+- Work with the current architecture and current visual identity.
+- Keep the aesthetic premium, elegant, smooth, and high-end.
+- Prioritize clean mobile responsiveness, correct spacing, alignment, readable typography, and smooth interactions.
+- Debug the current Card List screen so all content fits correctly on screen without awkward wrapping, clipping, overlap, or broken alignment.
+- Use the provided screenshot as a visual reference for layout density, style, and current problem areas.
+- Make the implementation feel like a real polished fintech app ready for users.
+
+==================================================
+PRIMARY OBJECTIVE
+==================================================
+
+Implement the following features and fixes:
+
+1. PAY TAB: ADD “TRANSACTION HISTORY (N)” BUTTON BELOW “MONEY OUT”
+2. PAY TAB: FULL TRANSACTION HISTORY SHOULD HAVE A BEAUTIFUL PENDING/POSTED SWIPE TOGGLE
+3. CARD DETAIL VIEW: ADD A “TRANSACTIONS” SUBMENU TAB NEXT TO “SUBSCRIPTIONS”
+4. CARD DETAIL VIEW: SHOW A DASHED CIRCLE / DONUT GRAPH FOR TRANSACTION CATEGORY PERCENTAGES
+5. CARD DETAIL VIEW: AUTO-SCROLL DOWN TO TRANSACTION SECTION WHEN “TRANSACTIONS” TAB IS CLICKED
+6. ADD “FEEDBACK” AND “CUSTOMER SERVICE” BUTTONS TO THE END OF CARD LIST AND OPTIONS TAB
+7. CREDIT PROFILE: MAKE CREDIT UTILIZATION CLICKABLE TO OPEN UTILIZATION DETAILS FOR ALL CARDS
+8. DEBUG THE CARD LIST PAGE SO IT FITS THE SCREEN PROPERLY AND LOOKS ITS BEST
+
+==================================================
+DETAILED PRODUCT REQUIREMENTS
+==================================================
+
+A) PAY TAB — TRANSACTION HISTORY BUTTON
+- In the Pay tab, directly below the “Money Out” rectangle/card, add a button labeled:
+
+  Transaction History (N)
+
+- N must dynamically equal the amount of cards currently listed in the Card List tab.
+- Example:
+  - if user has 3 cards, show: Transaction History (3)
+
+STYLE:
+- Transparent background
+- Blue text/button styling
+- Bold letters
+- Premium polished appearance
+- Touch-friendly but not bulky
+- It should look like a refined fintech action link/button, not a cheap default button
+
+BEHAVIOR:
+- When clicked, smoothly scroll down to the full transaction history section in the Pay tab.
+
+B) PAY TAB — TRANSACTION HISTORY SECTION WITH PENDING / POSTED
+Create a visually stunning transaction history module.
+
+LAYOUT:
+- At the top of the section show:
+  - “Transaction History”
+- Beneath that, but above the actual transactions list, show two words:
+  - Pending on the left
+  - Posted on the right
+
+INTERACTION:
+- The transactions area must be horizontally swipeable between:
+  - Pending transactions
+  - Posted transactions
+- As the user swipes:
+  - the active side label becomes darker / more emphasized
+  - the inactive one becomes lighter / less emphasized
+- This visual state must update automatically during swipe and on settle.
+- Also allow tap on “Pending” or “Posted” to jump to that corresponding side.
+
+VISUAL DIRECTION:
+- Make this look stunning, modern, fluid, and premium
+- Smooth animation
+- Nice easing
+- Luxurious, sharp, neon-fintech polish that matches the purple theme
+- Clean card rows for transactions
+- Great readability
+- No clutter
+
+DATA BEHAVIOR:
+- Support all-card transaction history in this Pay tab section
+- Group or filter transactions by pending vs posted state
+- If there are no transactions in a state, show a polished empty state message
+
+C) CARD LIST — INDIVIDUAL CARD DETAILS: ADD “TRANSACTIONS” TAB
+When a user clicks an individual card from the Card List, there is a submenu currently including subscriptions. Add a new tab:
+
+- Transactions
+
+Placement:
+- Put “Transactions” right next to “Subscriptions”
+
+WHEN CLICKING “TRANSACTIONS”:
+1. The interface should switch to the transactions-focused state
+2. Right below the submenu, inside that same content box/container, show a dashed circle pie graph / donut graph
+3. Then automatically scroll the page slightly downward so the user is guided into the transaction analytics + transactions list section
+
+D) CARD DETAIL — TRANSACTION CATEGORY DONUT GRAPH
+Under the card’s submenu, when “Transactions” is selected, show a premium dashed circular graph that visualizes how the selected card’s transactions are distributed by category.
+
+Examples of categories:
+- Gas
+- Supermarket
+- Healthcare
+- Dining
+- Travel
+- Shopping
+- Bills
+- Entertainment
+- Other
+
+GRAPH REQUIREMENTS:
+- Dashed circle / donut style
+- Each segment represents percentage of spend by category for that specific card
+- Elegant labeling
+- Match current app palette and premium styling
+- Must be readable on mobile
+- No overcrowding
+- Add percentage values and category legend or compact labels
+- Use subtle glow / premium styling only if tasteful
+
+DATA LOGIC:
+- Calculate percentages from that card’s transaction data
+- Show based on transaction amount totals by category
+- Handle zero-state gracefully
+- If category mapping does not exist yet, create a robust category mapping layer using merchant/category fields or fallback logic
+
+E) CARD DETAIL — TRANSACTIONS SECTION
+After showing the graph, below it show the same transaction state behavior requested in the Pay tab:
+- Pending
+- Posted
+- Swipe or segmented interaction between them
+- Card-specific transaction list only
+- Same premium interaction model
+
+F) FEEDBACK AND CUSTOMER SERVICE BUTTONS
+Add these buttons:
+- Feedback
+- Customer Service
+
+Placement:
+- At the end/bottom of the Card List tab
+- At the end/bottom of the Options tab
+
+STYLE:
+- Premium, elegant, consistent with app theme
+- Clear CTA but not oversized
+- Touch-friendly
+- Proper spacing from surrounding content
+
+BEHAVIOR:
+- If backend functionality does not yet exist, wire them with polished placeholder actions or modal sheets:
+  - Feedback: opens feedback form modal or screen
+  - Customer Service: opens support/contact modal or screen
+- These should be structured so real backend/service integration can be added later easily
+
+G) CREDIT PROFILE — CLICKABLE CREDIT UTILIZATION
+In the Card List credit profile area, make the Credit Utilization module/button clickable.
+
+WHEN CLICKED:
+Open a utilization details view, modal, bottom sheet, or expandable section that shows:
+- each listed card
+- utilization percentage per card
+- current balance per card
+- credit limit per card
+- combined credit limit
+- combined utilization percentage
+- optionally combined used credit amount
+
+PRESENTATION:
+- Clean fintech breakdown
+- Clear hierarchy
+- Easy to read
+- Responsive on mobile
+- Should feel analytical and premium, not plain
+
+==================================================
+DEBUGGING + RESPONSIVE FIXES REQUIRED
+==================================================
+
+The Card List page currently has fit-and-layout problems. Fix them thoroughly.
+
+Observed issues to resolve:
+- text wrapping awkwardly
+- content not fitting properly on screen
+- visual crowding in the credit profile
+- inconsistent spacing and alignment
+- some labels likely too large for available width
+- the current page needs to be optimized for real mobile screen sizes
+
+SPECIFIC DEBUG/FIT GOALS:
+- Make the screen fit properly without ruining the design
+- Reduce text size slightly where necessary
+- Adjust spacing, padding, margin, card heights, and font scaling where necessary
+- Avoid clipped labels and broken line breaks
+- Keep headings elegant and legible
+- Make sure the credit profile content fits naturally
+- Ensure Equifax / Experian / TransUnion presentation feels balanced and aligned
+- Fix any buggy offsets in rewards, subscriptions, cash back, and other text areas if present in current code
+- Preserve background art but reduce interference with readability if needed
+- Improve contrast where needed
+- Ensure bottom navigation remains clean and does not overlap content
+- Avoid overflow on small screens and common phone sizes
+
+==================================================
+DESIGN SYSTEM / VISUAL DIRECTION
+==================================================
+
+Keep the existing luxury purple fintech aesthetic:
+- Rich purple background
+- Neon-like accent highlights where tasteful
+- Premium glassmorphism / soft glow feel
+- Clean, precise rounded cards
+- Elegant typography hierarchy
+- Smooth animations
+- High-end fintech vibe
+
+But improve usability:
+- better readability
+- better spacing
+- better state indication
+- better information density control
+- less clutter
+- more intentional alignment
+
+Make the new UI feel like:
+“premium credit intelligence + payment control dashboard”
+
+==================================================
+TECHNICAL IMPLEMENTATION EXPECTATIONS
+==================================================
+
+Please do all of the following:
+
+1. Inspect current component structure and reuse existing design tokens, colors, components, and spacing rules where possible.
+2. Add the new UI in a modular way rather than hacking everything into one file.
+3. Use clean state management for:
+   - selected card
+   - selected submenu tab
+   - transaction history mode (pending / posted)
+   - scroll-to-section behavior
+4. Implement smooth scrolling to sections.
+5. Implement swipe interaction cleanly and reliably.
+6. Make the Pending/Posted selector support both:
+   - swipe gesture
+   - tap-to-switch
+7. Add dummy/mock transaction/category data if live data is not yet fully wired, but structure code so real data can be plugged in easily.
+8. Make the transaction category calculation reusable.
+9. Make the credit utilization calculation reusable.
+10. Ensure code is mobile responsive and visually tested for smaller screens.
+
+==================================================
+ACCEPTANCE CRITERIA
+==================================================
+
+The task is complete only if all of the following are true:
+
+- Pay tab has a visible “Transaction History (N)” button below Money Out
+- N dynamically matches the number of listed cards
+- Clicking that button smoothly scrolls to full transaction history
+- Full transaction history supports Pending and Posted states
+- User can swipe between Pending and Posted
+- Pending/Posted labels visually react to active state
+- Individual card details now include a Transactions tab next to Subscriptions
+- Clicking Transactions shows a dashed donut chart of spending category percentages for that specific card
+- Clicking Transactions auto-scrolls slightly downward toward analytics/transaction content
+- Card-specific transactions also support Pending and Posted state switching
+- Feedback and Customer Service buttons are added at the bottom of both Card List and Options
+- Credit Utilization is clickable and opens a detailed utilization breakdown
+- Card List page fits properly on mobile screens
+- Text wrapping, spacing, and alignment issues are debugged
+- No ugly overflow, clipping, or broken layout remains
+- UI feels polished and premium, not unfinished
+
+==================================================
+DELIVERABLE FORMAT
+==================================================
+
+Please make the code changes directly and then summarize:
+1. what components were added or changed
+2. what layout bugs were fixed
+3. what placeholder/mock logic was used
+4. what still needs backend wiring, if anything
+
+Do not give me a generic explanation. Actually implement the feature set and refine the UI with product-quality judgment.
