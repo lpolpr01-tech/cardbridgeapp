@@ -42,7 +42,7 @@ function SubscriptionsRow() {
           <Feather name="repeat" size={16} color={Colors.primary} />
         </View>
         <View style={sub.info}>
-          <Text style={sub.title}>Subscriptions</Text>
+          <Text style={sub.title} numberOfLines={1}>Subscriptions</Text>
           <View style={sub.dots}>
             {cardTotals.map((c) => (
               <View key={c.id} style={[sub.dot, { backgroundColor: c.color }]} />

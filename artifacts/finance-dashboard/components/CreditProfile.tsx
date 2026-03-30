@@ -943,7 +943,177 @@ const SENTIMENT_BG = {
   negative: "rgba(255,107,138,0.12)",
 };
 
+// ─── Factor Detail Modal ──────────────────────────────────────────────────────
+
+interface FactorDetail {
+  what: string;
+  why: string;
+  impact: string;
+  tips: string[];
+}
+
+const FACTOR_DETAILS: Record<string, FactorDetail> = {
+  util: {
+    what: "Credit utilization is the percentage of your available revolving credit you're currently using. It compares your total credit card balances to your total credit limits.",
+    why: "Lenders view high utilization as a sign of financial stress. It's the second most important factor in your credit score, accounting for about 30% of your FICO score.",
+    impact: "Your current utilization is 31% — just above the ideal 30% threshold. Bringing this below 30% could add up to 20 points to your score.",
+    tips: [
+      "Pay down balances before your statement closes to lower reported utilization.",
+      "Request a credit limit increase on existing cards (without spending more).",
+      "Spread balances across cards to avoid a single card exceeding 50% utilization.",
+      "Keep your total utilization under 10% for maximum score benefit.",
+    ],
+  },
+  payment: {
+    what: "Payment history is a record of whether you've paid your bills on time across all accounts — credit cards, loans, and other credit lines.",
+    why: "This is the single biggest factor in your credit score, making up 35% of your FICO score. Even one late payment can significantly drop your score.",
+    impact: "Your 98% on-time payment rate is excellent and strongly benefits your score. This record shows lenders you are a reliable borrower.",
+    tips: [
+      "Set up autopay for at least the minimum payment to avoid accidental late payments.",
+      "Pay before the due date, not the grace period end — banks report to bureaus on due dates.",
+      "If you missed a payment, bring it current quickly — the damage grows over time.",
+      "Contact your lender about goodwill adjustments for isolated late payments.",
+    ],
+  },
+  age: {
+    what: "Average account age is calculated by adding up the ages of all your credit accounts and dividing by the total number of accounts. Both open and closed accounts count.",
+    why: "Longer credit history gives lenders more data to evaluate your reliability. Account age accounts for about 15% of your FICO score.",
+    impact: "Your average account age is 4.2 years, which is moderate. Older accounts and a longer history will gradually improve this metric over time.",
+    tips: [
+      "Never close your oldest credit card — it anchors your average account age.",
+      "Keep old accounts open even if you rarely use them; charge a small recurring bill monthly.",
+      "Avoid opening many new accounts at once, which lowers your average age.",
+      "Be patient — this metric only improves with time.",
+    ],
+  },
+  inquiries: {
+    what: "Hard inquiries occur when a lender checks your credit report as part of a loan or credit card application. They differ from soft inquiries (like checking your own credit), which don't affect your score.",
+    why: "Multiple applications in a short period can signal financial distress to lenders. Hard inquiries account for about 10% of your FICO score and typically stay on your report for 2 years.",
+    impact: "You have 2 hard inquiries in the last 12 months. Each typically reduces your score by 3–7 points temporarily. Both should age off within the next 12 months.",
+    tips: [
+      "Avoid applying for new credit unless necessary — especially in the months before a major loan.",
+      "Rate-shopping for mortgages or auto loans within 14–45 days counts as a single inquiry.",
+      "Hard inquiries naturally lose impact after 12 months and drop off after 24 months.",
+      "Check if you have any unauthorized inquiries — you can dispute them.",
+    ],
+  },
+  mix: {
+    what: "Credit mix refers to the variety of credit account types you have, including credit cards (revolving credit), mortgages, auto loans, and student loans (installment credit).",
+    why: "Lenders like to see that you can manage different types of credit responsibly. Credit mix accounts for about 10% of your FICO score.",
+    impact: "You carry both revolving credit (credit cards) and installment accounts (auto, student loans) — this diversity is viewed positively by all three bureaus.",
+    tips: [
+      "Don't open accounts you don't need just to improve mix — the benefit is small.",
+      "If you only have credit cards, a small installment loan or secured loan can help.",
+      "Focus on payment history and utilization first — they matter far more.",
+      "Maintaining your current mix without closing accounts preserves this benefit.",
+    ],
+  },
+};
+
+function FactorDetailModal({ factor, visible, onClose }: { factor: ScoreFactor | null; visible: boolean; onClose: () => void }) {
+  if (!factor) return null;
+  const detail = FACTOR_DETAILS[factor.id];
+  const color = SENTIMENT_COLORS[factor.sentiment];
+  const bg    = SENTIMENT_BG[factor.sentiment];
+  const sentimentLabel = factor.sentiment === "positive" ? "Helping Your Score" : factor.sentiment === "negative" ? "Hurting Your Score" : "Neutral Impact";
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={fdm.overlay}>
+        <Pressable style={fdm.dismiss} onPress={onClose} />
+        <View style={fdm.sheet}>
+          {/* Handle */}
+          <View style={fdm.handle} />
+
+          {/* Header */}
+          <View style={fdm.header}>
+            <View style={[fdm.iconWrap, { backgroundColor: bg, borderColor: `${color}40` }]}>
+              <Feather name={factor.icon as any} size={20} color={color} />
+            </View>
+            <View style={fdm.headerText}>
+              <Text style={fdm.title}>{factor.title}</Text>
+              <View style={[fdm.pill, { backgroundColor: `${color}18`, borderColor: `${color}40` }]}>
+                <View style={[fdm.pillDot, { backgroundColor: color }]} />
+                <Text style={[fdm.pillLabel, { color }]}>{sentimentLabel}</Text>
+              </View>
+            </View>
+          </View>
+
+          <ScrollView style={fdm.body} showsVerticalScrollIndicator={false}>
+            {detail ? (
+              <>
+                <Text style={fdm.sectionLabel}>What is it?</Text>
+                <Text style={fdm.paragraph}>{detail.what}</Text>
+
+                <Text style={fdm.sectionLabel}>Why it matters</Text>
+                <Text style={fdm.paragraph}>{detail.why}</Text>
+
+                <Text style={fdm.sectionLabel}>Your status</Text>
+                <View style={[fdm.statusBox, { borderColor: `${color}40`, backgroundColor: `${color}0D` }]}>
+                  <Text style={[fdm.statusText, { color }]}>{detail.impact}</Text>
+                </View>
+
+                <Text style={fdm.sectionLabel}>How to improve</Text>
+                {detail.tips.map((tip, i) => (
+                  <View key={i} style={fdm.tipRow}>
+                    <View style={[fdm.tipBullet, { backgroundColor: color }]} />
+                    <Text style={fdm.tipText}>{tip}</Text>
+                  </View>
+                ))}
+                <View style={{ height: 20 }} />
+              </>
+            ) : (
+              <Text style={fdm.paragraph}>{factor.explanation}</Text>
+            )}
+          </ScrollView>
+
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [fdm.closeBtn, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={fdm.closeBtnText}>Got it</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const fdm = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" },
+  dismiss: { flex: 1 },
+  sheet: {
+    backgroundColor: "#1A103F",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    paddingBottom: 32,
+    maxHeight: "88%",
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.25)", alignSelf: "center", marginTop: 10, marginBottom: 8 },
+  header: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  iconWrap: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 1, flexShrink: 0 },
+  headerText: { flex: 1, gap: 6 },
+  title: { fontFamily: "Inter_700Bold", fontSize: 17, color: "#fff" },
+  pill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, alignSelf: "flex-start" },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+  pillLabel: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  body: { paddingHorizontal: 20, paddingTop: 16, flexGrow: 0 },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, marginTop: 16 },
+  paragraph: { fontFamily: "Inter_400Regular", fontSize: 14, color: "rgba(255,255,255,0.8)", lineHeight: 22 },
+  statusBox: { borderRadius: 12, borderWidth: 1, padding: 14 },
+  statusText: { fontFamily: "Inter_500Medium", fontSize: 14, lineHeight: 21 },
+  tipRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 10 },
+  tipBullet: { width: 6, height: 6, borderRadius: 3, marginTop: 7, flexShrink: 0 },
+  tipText: { fontFamily: "Inter_400Regular", fontSize: 14, color: "rgba(255,255,255,0.75)", lineHeight: 21, flex: 1 },
+  closeBtn: { marginHorizontal: 20, marginTop: 16, backgroundColor: "#4F7FFF", borderRadius: 14, paddingVertical: 14, alignItems: "center" },
+  closeBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#fff" },
+});
+
 export function ScoreFactorsCard({ factors }: { factors: ScoreFactor[] }) {
+  const [selectedFactor, setSelectedFactor] = useState<ScoreFactor | null>(null);
+
   return (
     <FadeSlideIn delay={240}>
       <View style={[sh.card, GLASS]}>
@@ -955,24 +1125,35 @@ export function ScoreFactorsCard({ factors }: { factors: ScoreFactor[] }) {
             return (
               <React.Fragment key={f.id}>
                 {i > 0 && <View style={sh.divider} />}
-                <View style={sf.item}>
+                <Pressable
+                  onPress={() => setSelectedFactor(f)}
+                  style={({ pressed }) => [sf.item, pressed && { opacity: 0.75 }]}
+                >
                   <View style={[sf.iconWrap, { backgroundColor: bg, borderColor: `${color}40` }]}>
                     <Feather name={f.icon as any} size={14} color={color} />
                   </View>
                   <View style={sf.body}>
                     <View style={sf.titleRow}>
                       <Text style={sf.title}>{f.title}</Text>
-                      <View style={[sf.dot, { backgroundColor: color }]} />
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={[sf.dot, { backgroundColor: color }]} />
+                        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.3)" />
+                      </View>
                     </View>
                     <Text style={sf.explanation}>{f.explanation}</Text>
                   </View>
-                </View>
+                </Pressable>
               </React.Fragment>
             );
           })}
         </View>
         <PrivacyBadge label="Securely synced" />
       </View>
+      <FactorDetailModal
+        factor={selectedFactor}
+        visible={selectedFactor !== null}
+        onClose={() => setSelectedFactor(null)}
+      />
     </FadeSlideIn>
   );
 }

@@ -10,6 +10,7 @@ import {
   FlatList,
   Image,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -2391,6 +2392,24 @@ export default function PayScreen() {
   const [confettiVisible, setConfettiVisible]           = useState(false);
   const [txStatus, setTxStatus]                         = useState<"pending" | "posted">("posted");
 
+  // Swipe gesture for Pending / Posted toggle
+  const txSwipeRef = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 10,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -15) {
+          setTxStatus("posted");
+          Haptics.selectionAsync();
+        } else if (gs.dx > 15) {
+          setTxStatus("pending");
+          Haptics.selectionAsync();
+        }
+      },
+    })
+  ).current;
+
   // Scroll tracking
   const listRef = useRef<FlatList<any>>(null);
   const scrollYRef = useRef(0);
@@ -2425,8 +2444,6 @@ export default function PayScreen() {
   }, [transactions, filter, txCycle, txStatus, TX_PENDING_CUTOFF]);
 
   const cardById = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
-  const totalDebit  = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0), [transactions]);
-  const totalCredit = useMemo(() => transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0), [transactions]);
 
   const generateConfirmationNumber = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -2548,40 +2565,21 @@ export default function PayScreen() {
                 </View>
               </View>
 
-              {/* Summary */}
-              <View style={[styles.summaryRow, GLASS_INLINE]}>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryLabel}>Money In</Text>
-                  <Text style={[styles.summaryAmt, { color: Colors.positive }]}>+{formatCurrency(totalCredit)}</Text>
-                </View>
-                <View style={styles.summaryDiv} />
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryLabel}>Money Out</Text>
-                  <Text style={[styles.summaryAmt, { color: Colors.negative }]}>-{formatCurrency(totalDebit)}</Text>
-                  <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      if (filtered.length > 0) {
-                        listRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: 10 });
-                      } else {
-                        listRef.current?.scrollToOffset({ offset: 9999, animated: true });
-                      }
-                    }}
-                    style={({ pressed }) => [styles.txHistoryBtn, pressed && { opacity: 0.75 }]}
-                  >
-                    <Feather name="list" size={11} color={Colors.primary} />
-                    <Text style={styles.txHistoryBtnText}>
-                      Transaction History ({transactions.length})
-                    </Text>
-                    <Feather name="chevron-right" size={11} color={Colors.primary} />
-                  </Pressable>
-                </View>
-              </View>
-
               {/* Scheduled payments */}
               {scheduledPayments.length > 0 && (
                 <>
-                  <Text style={styles.sectionTitle}>Scheduled Payments</Text>
+                  <View style={styles.scheduledHeaderRow}>
+                    <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Scheduled Payments</Text>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        listRef.current?.scrollToOffset({ offset: 9999, animated: true });
+                      }}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                    >
+                      <Text style={styles.txHistoryLabel}>Transaction History</Text>
+                    </Pressable>
+                  </View>
                   {scheduledPayments.map((sp) => {
                     const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
                     return (
@@ -2687,7 +2685,7 @@ export default function PayScreen() {
             </View>
 
             {/* Transaction History: pending/posted toggle + type filter */}
-            <View style={styles.filterRow}>
+            <View style={styles.filterRow} {...txSwipeRef.panHandlers}>
               <View style={styles.txStatusRow}>
                 <Text style={styles.sectionTitle}>Transaction History</Text>
                 <View style={styles.txStatusToggle}>
@@ -2910,6 +2908,19 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     paddingHorizontal: 20,
     marginBottom: 10,
+  },
+  scheduledHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: 20,
+    marginBottom: 10,
+  },
+  txHistoryLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: Colors.primary,
+    letterSpacing: 0.2,
   },
   scheduledCard: {
     marginHorizontal: 20,

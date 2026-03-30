@@ -1,0 +1,129 @@
+Act as a senior product owner + senior frontend/mobile engineer. Review the current fintech app codebase and implement the following UI/UX fixes and feature improvements with production-quality standards. Preserve the existing design language where possible, but prioritize clarity, responsiveness, and intuitive interaction. Do not break existing working flows. After implementing, provide a concise changelog of what was changed, which files were touched, and any assumptions made.
+
+PROJECT GOAL
+This app should feel polished, premium, responsive, and ready to scale as a serious fintech product. Focus on iPhone responsiveness, clean interaction patterns, and logically separated information architecture.
+
+1) PAY TAB — REMOVE MONEY IN / MONEY OUT UI
+- Remove the “Money In” and “Money Out” interface from the Pay tab completely.
+- Keep the “Transaction History” control only.
+- Position “Transaction History” on the far right side of the “Scheduled Payments” title row.
+- Remove any pill, bubble, chip, or outlined container around “Transaction History.”
+- It should appear as clean bold text only, aligned professionally in the header row.
+- Make sure spacing and alignment are balanced and visually polished.
+
+2) PAY TAB — FIX CREDIT SCORE CARD RESPONSIVENESS
+Current issue:
+- The credit score section is too large and overlaps the screen on iPhone 14 Pro.
+- The word “Subscriptions” is splitting awkwardly instead of fitting properly.
+
+Required fix:
+- Make the Pay tab layout fully responsive across iPhone sizes, including standard and Plus/Max models.
+- Add automatic responsive scaling behavior so text, cards, spacing, and layout adapt to screen size and resolution.
+- Prevent any overlap, clipping, or broken wrapping.
+- Ensure labels like “Subscriptions” remain readable and do not split unnaturally.
+- Use best practices such as responsive typography, min/max font sizing, flexible containers, safe area handling, and width constraints.
+- Keep the UI looking uniform across device sizes rather than manually sized for one screen.
+
+3) PAY TAB — FIX PENDING / POSTED INTERACTION
+Current issue:
+- The Pending / Posted menu appears swipeable but currently only works by tapping.
+
+Required behavior:
+- Restore true swipe/gesture functionality for the Pending / Posted transaction section.
+- Users should be able to:
+  - swipe right to view Pending transactions
+  - swipe left to view Posted transactions
+- Tapping the tab labels should still work too.
+- Inside the Posted section, preserve the existing mini-tabs:
+  - All
+  - Debit
+  - Credit
+- Make the swipe interaction smooth, intuitive, and visually consistent with a fintech app.
+- Add proper state handling so the selected section and mini-tab remain accurate.
+- Avoid gesture conflicts with vertical scrolling.
+
+4) CARDS TAB — FIX INDIVIDUAL CARD DROPDOWN / CONTENT OVERFLOW
+Current issue:
+- In each individual card menu, the long dropdown scrolls too far and reaches the transactions content.
+- Transactions are appearing inside other feature sections where they should not appear.
+
+Required fix:
+- In each individual card view, separate content sections cleanly.
+- Remove transactions content from all non-transaction sections, including:
+  - Rewards & Benefits
+  - Billing Dates
+  - Subscriptions
+  - any other non-transaction info panel
+- Only show transactions inside the dedicated Transactions tab for that individual card.
+- For non-transaction sections, adjust layout/scroll boundaries so users cannot scroll lower than the content that belongs to that section.
+- Each section should have a clean content height, proper padding, and no bleed into the next section.
+- Make sure the information architecture feels intentional and not like one long uncontrolled scroll.
+
+5) INDIVIDUAL CARD TRANSACTIONS — ADD SAME PENDING / POSTED SWIPE UX
+- In each individual card’s Transactions tab, implement the same interaction pattern as the Pay tab:
+  - swipe between Pending and Posted
+  - tap between Pending and Posted
+- In the Posted view, preserve or recreate any relevant filtering needed for posted transactions.
+- Keep the interaction consistent across the app so users learn one behavior and use it everywhere.
+
+6) CREDIT PROFILE — ADD FUNCTIONAL DETAIL VIEWS FOR “WHAT’S AFFECTING YOUR CREDIT”
+Current issue:
+- The buttons in the “What’s affecting your credit” section do not provide enough educational or explanatory value.
+
+Required improvement:
+- Add meaningful drill-down or expandable detail behavior for each factor/button in the “What’s affecting your credit” section.
+- Example: “Average Account Age” should open or expand into a professional explanation of:
+  - what it means
+  - why it matters
+  - how it affects credit profile
+  - whether the user’s status is positive / neutral / negative
+  - simple guidance for improvement
+- Apply this logic to each factor in that section.
+- Make the content feel professional, educational, and intuitive, similar to a premium credit-monitoring experience.
+- Use a consistent UI pattern such as:
+  - bottom sheet
+  - modal
+  - expandable card
+  - inline accordion
+Choose whichever best fits the existing app design.
+- The explanations should be short enough for mobile, but informative enough that users understand what is impacting their credit.
+
+UX / DESIGN EXPECTATIONS
+- Maintain a premium fintech feel.
+- Clean spacing, alignment, and typography.
+- Consistent component behavior across tabs.
+- Responsive mobile-first design.
+- Avoid oversized text, clipped cards, broken wrapping, or awkward overflow.
+- Preserve accessibility and touch-friendly tap targets.
+- Ensure all gesture-based interactions also have tap fallback.
+- Prevent nested scroll issues wherever possible.
+
+TECHNICAL EXPECTATIONS
+- Inspect and refactor the relevant components instead of patching visually only.
+- Use reusable responsive utilities if needed.
+- Ensure no regressions in existing navigation and state.
+- Clean up any layout bugs caused by fixed heights, improper overflow settings, or hardcoded widths/font sizes.
+- Keep code modular and maintainable.
+- If needed, create shared components for segmented controls, transaction views, or explanatory info cards.
+
+QA / ACCEPTANCE CRITERIA
+A change is only complete if all of the below are true:
+1. Pay tab no longer shows Money In / Money Out.
+2. Transaction History appears as bold text only on the far right of Scheduled Payments.
+3. Credit score section no longer overlaps on iPhone 14 Pro and scales properly across iPhone sizes.
+4. “Subscriptions” and similar labels display correctly and do not break awkwardly.
+5. Pending / Posted on Pay tab works with both swipe and tap.
+6. Swiping right/left correctly changes transaction states.
+7. Posted tab still contains All / Debit / Credit mini-tabs.
+8. Individual card non-transaction tabs no longer scroll into transactions.
+9. Transactions only appear in the Transactions tab.
+10. Individual card Transactions tab supports the same Pending / Posted swipe behavior.
+11. “What’s affecting your credit” buttons now open useful educational detail views.
+12. Final UI looks polished, professional, and production-ready.
+
+DELIVERABLES
+After implementation, provide:
+- a short summary of completed changes
+- any components/screens refactored
+- any unresolved issues if found
+- suggestions for the next best UX improvements if additional refinement is needed

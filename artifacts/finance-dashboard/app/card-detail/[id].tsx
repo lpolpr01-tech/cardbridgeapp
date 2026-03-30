@@ -4,9 +4,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Dimensions,
-  FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +16,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
-import { TransactionItem } from "@/components/TransactionItem";
 import type { CardRewards } from "@/context/FinanceContext";
 import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
 
@@ -396,6 +395,18 @@ function TransactionsPanel({ cardId }: { cardId: string }) {
   const cardTxs = transactions.filter((t) => t.cardId === cardId);
   const [txStatus, setTxStatus] = useState<"pending" | "posted">("posted");
 
+  const swipeRef = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > Math.abs(gs.dy) && Math.abs(gs.dx) > 10,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -15) setTxStatus("posted");
+        else if (gs.dx > 15) setTxStatus("pending");
+      },
+    })
+  ).current;
+
   const slices = buildCategoryData(cardTxs);
 
   const shown = cardTxs
@@ -421,7 +432,7 @@ function TransactionsPanel({ cardId }: { cardId: string }) {
 
       <View style={txp.divider} />
 
-      <View style={txp.toggleRow}>
+      <View style={txp.toggleRow} {...swipeRef.panHandlers}>
         <Text style={txp.toggleLabel}>Transactions</Text>
         <View style={txp.toggle}>
           {(["pending", "posted"] as const).map((s) => (
@@ -568,7 +579,6 @@ export default function CardDetailScreen() {
 
   const card = cards.find((c) => c.id === id);
   const cardTransactions = transactions.filter((t) => t.cardId === id);
-  const sorted = [...cardTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const totalSpent = cardTransactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0);
   const totalIncome = cardTransactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
 
@@ -587,97 +597,73 @@ export default function CardDetailScreen() {
       colors={[Colors.backgroundGradientStart, Colors.backgroundGradientEnd]}
       style={styles.gradient}
     >
-      <FlatList
-        data={sorted}
-        keyExtractor={(item) => item.id}
+      <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
-        ListHeaderComponent={() => (
-          <>
-            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-              <Pressable
-                onPress={() => router.back()}
-                style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-              >
-                <Feather name="chevron-left" size={22} color={Colors.textPrimary} />
-                <Text style={styles.backText}>Cards</Text>
-              </Pressable>
+      >
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Feather name="chevron-left" size={22} color={Colors.textPrimary} />
+            <Text style={styles.backText}>Cards</Text>
+          </Pressable>
+        </View>
+
+        <LinearGradient
+          colors={card.color as [string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
+        >
+          <View style={styles.heroTop}>
+            <View>
+              <Text style={styles.heroName}>{card.name}</Text>
+              <Text style={styles.heroNumber}>•••• •••• •••• {card.lastFour}</Text>
             </View>
-
-            <LinearGradient
-              colors={card.color as [string, string]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroTop}>
-                <View>
-                  <Text style={styles.heroName}>{card.name}</Text>
-                  <Text style={styles.heroNumber}>•••• •••• •••• {card.lastFour}</Text>
-                </View>
-                <CardTypeBadge type={card.type} />
-              </View>
-
-              <View style={styles.heroMid}>
-                <Text style={styles.heroBalLabel}>Current Balance</Text>
-                <Text style={styles.heroBal}>{formatCurrency(card.balance)}</Text>
-              </View>
-
-              <View>
-                <View style={styles.heroLimitRow}>
-                  <Text style={styles.heroLimitText}>Credit limit: {formatCurrency(card.limit)}</Text>
-                  <Text style={styles.heroLimitText}>{usagePct.toFixed(0)}% used</Text>
-                </View>
-                <View style={styles.heroProg}>
-                  <View style={[styles.heroProgFill, { width: `${usagePct}%` as any }]} />
-                </View>
-              </View>
-
-              <View style={styles.heroShimmer1} />
-              <View style={styles.heroShimmer2} />
-            </LinearGradient>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Total Spent</Text>
-                <Text style={[styles.statValue, { color: Colors.negative }]}>-{formatCurrency(totalSpent)}</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Total In</Text>
-                <Text style={[styles.statValue, { color: Colors.positive }]}>+{formatCurrency(totalIncome)}</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Transactions</Text>
-                <Text style={styles.statValue}>{cardTransactions.length}</Text>
-              </View>
-            </View>
-
-            {/* Horizontally scrollable info: Rewards + Billing */}
-            <CardInfoScroll rewards={card.rewards} cardId={card.id} balance={card.balance} />
-
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Transactions</Text>
-              <Pressable
-                onPress={() => router.push({ pathname: "/card-transactions/[id]", params: { id: card.id } })}
-                style={({ pressed }) => [styles.seeAllBtn, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.seeAllText}>See all</Text>
-                <Feather name="chevron-right" size={14} color={Colors.primary} />
-              </Pressable>
-            </View>
-          </>
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => <TransactionItem transaction={item} card={card} />}
-        ListEmptyComponent={() => (
-          <View style={styles.empty}>
-            <Feather name="inbox" size={32} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>No transactions yet</Text>
+            <CardTypeBadge type={card.type} />
           </View>
-        )}
-      />
+
+          <View style={styles.heroMid}>
+            <Text style={styles.heroBalLabel}>Current Balance</Text>
+            <Text style={styles.heroBal}>{formatCurrency(card.balance)}</Text>
+          </View>
+
+          <View>
+            <View style={styles.heroLimitRow}>
+              <Text style={styles.heroLimitText}>Credit limit: {formatCurrency(card.limit)}</Text>
+              <Text style={styles.heroLimitText}>{usagePct.toFixed(0)}% used</Text>
+            </View>
+            <View style={styles.heroProg}>
+              <View style={[styles.heroProgFill, { width: `${usagePct}%` as any }]} />
+            </View>
+          </View>
+
+          <View style={styles.heroShimmer1} />
+          <View style={styles.heroShimmer2} />
+        </LinearGradient>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Total Spent</Text>
+            <Text style={[styles.statValue, { color: Colors.negative }]}>-{formatCurrency(totalSpent)}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Total In</Text>
+            <Text style={[styles.statValue, { color: Colors.positive }]}>+{formatCurrency(totalIncome)}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Transactions</Text>
+            <Text style={styles.statValue}>{cardTransactions.length}</Text>
+          </View>
+        </View>
+
+        {/* Horizontally scrollable info: Rewards, Billing, Subscriptions, Transactions */}
+        <CardInfoScroll rewards={card.rewards} cardId={card.id} balance={card.balance} />
+      </ScrollView>
     </LinearGradient>
   );
 }
