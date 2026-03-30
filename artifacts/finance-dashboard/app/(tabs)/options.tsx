@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useRef, useState } from "react";
+import { SupportSection } from "@/components/SupportSection";
 import {
   Alert,
   Animated,
@@ -1231,14 +1232,7 @@ export default function OptionsScreen() {
           <SettingRow icon="shield" label="Identity Verification" subtitle="Submit KYC documents" onPress={() => setKycVisible(true)} />
         </View>
 
-        <SectionLabel text="Support" />
-        <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow icon="help-circle" label="Help Center" onPress={() => {}} />
-          <View style={styles.rowDivider} />
-          <SettingRow icon="message-square" label="Contact Us" onPress={() => {}} />
-          <View style={styles.rowDivider} />
-          <SettingRow icon="star" label="Rate the App" onPress={() => {}} />
-        </View>
+        <SupportSection />
 
         <Pressable
           style={({ pressed }) => [styles.signOutBtn, pressed && { opacity: 0.75 }]}

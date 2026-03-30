@@ -22,6 +22,7 @@ import { WalletCardStack } from "@/components/WalletCardStack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
 import { CreditProfileSection } from "@/components/CreditProfile";
+import { SupportSection } from "@/components/SupportSection";
 
 // ─── Subscriptions Row ────────────────────────────────────────────────────────
 
@@ -585,6 +586,9 @@ export default function CardListScreen() {
         <WalletCardStack cards={cards} transactionCounts={transactionCounts} />
         <SubscriptionsRow />
         <CreditProfileSection status="success" />
+        <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+          <SupportSection />
+        </View>
       </ScrollView>
 
       {/* Floating Bubble Menu */}

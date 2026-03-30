@@ -1,0 +1,227 @@
+You are working inside my existing fintech mobile app project. Do not explain generally. Do not rewrite the whole app. Inspect the current codebase, find the correct files/components, and implement the changes directly.
+
+GOAL:
+Improve the Pay tab and Card List tab with new transaction features, utilization details, support buttons, and responsive fixes. Keep the current luxury purple fintech style. Focus on clean mobile layout, smooth UX, and bug-free implementation.
+
+IMPORTANT RULES:
+- Reuse existing components, styles, theme tokens, and navigation patterns where possible
+- Do not break existing functionality
+- Keep the current visual identity
+- Make all new UI mobile responsive
+- Fix layout overflow, wrapping, and alignment issues on the Card List screen
+- If real backend data is missing, create mock data helpers but structure code so live data can replace it easily
+- After coding, provide a summary of changed files and what was implemented
+
+==================================================
+TASK 1 — PAY TAB: ADD TRANSACTION HISTORY BUTTON
+==================================================
+
+Find the Pay tab screen.
+
+Below the “Money Out” rectangle/card, add a pressable text-style button:
+
+Transaction History (N)
+
+Requirements:
+- N = total number of cards shown in the Card List tab
+- transparent background
+- blue text
+- bold font
+- visually elegant, premium, and touch-friendly
+- aligned cleanly under the Money Out section
+- on press, smoothly scroll to the full transaction history section lower on the Pay tab
+
+==================================================
+TASK 2 — PAY TAB: FULL TRANSACTION HISTORY WITH PENDING / POSTED SWITCH
+==================================================
+
+In the Pay tab, create or improve the full transaction history section.
+
+Requirements:
+- Header title: “Transaction History”
+- Between the title and the transaction list, show:
+  - Pending on the left
+  - Posted on the right
+- The transaction content must support switching between Pending and Posted
+- Support both:
+  - tapping Pending / Posted
+  - horizontal swipe between Pending and Posted views
+- When active:
+  - active label becomes darker / more emphasized
+  - inactive label becomes lighter
+- Animate the transition smoothly
+- Show corresponding transactions for the selected state
+- If empty, show a polished empty state
+- Make it look premium and visually strong, not plain
+
+Implementation suggestion:
+- create a reusable transaction state switcher component if needed
+- support all-card transaction history in the Pay tab
+
+==================================================
+TASK 3 — CARD LIST: ADD TRANSACTIONS TAB IN CARD DETAIL SUBMENU
+==================================================
+
+Find the screen/view opened when a user taps an individual card in Card List.
+
+There is already a submenu with items like Subscriptions.
+Add a new submenu item:
+
+Transactions
+
+Place it directly next to Subscriptions.
+
+When Transactions is pressed:
+- activate the Transactions view
+- auto-scroll slightly downward to guide the user into the analytics + transaction section
+- inside the same content area below the submenu, render a transaction analytics widget first
+- below that, show the card-specific transaction history with Pending / Posted switching like in the Pay tab
+
+==================================================
+TASK 4 — CARD DETAIL: DASHED DONUT / PIE GRAPH FOR TRANSACTION TYPES
+==================================================
+
+Under the submenu in the individual card view, when Transactions is selected, show a dashed donut-style chart.
+
+Purpose:
+Display percentage breakdown of that card’s transactions by category.
+
+Example categories:
+- Gas
+- Supermarket
+- Healthcare
+- Dining
+- Travel
+- Shopping
+- Bills
+- Entertainment
+- Other
+
+Requirements:
+- use current app palette
+- premium, elegant, readable on mobile
+- dashed ring / donut look
+- show category percentages
+- include compact legend or labels
+- calculate based on transaction totals for that card
+- if transaction category data is not clean, add mapping/fallback logic
+- if there is no data, show a clean empty state
+
+==================================================
+TASK 5 — CARD DETAIL: CARD-SPECIFIC PENDING / POSTED TRANSACTIONS
+==================================================
+
+Below the donut chart, show the selected card’s transactions.
+
+Requirements:
+- same Pending / Posted toggle behavior as Pay tab
+- support tap and swipe
+- only transactions for the selected card
+- polished transaction row design
+- mobile friendly spacing and readability
+
+==================================================
+TASK 6 — ADD FEEDBACK + CUSTOMER SERVICE BUTTONS
+==================================================
+
+At the bottom of BOTH:
+- Card List tab
+- Options tab
+
+Add two buttons:
+- Feedback
+- Customer Service
+
+Requirements:
+- consistent with premium app style
+- properly spaced
+- touch-friendly
+- if backend is not implemented, open placeholder modal / sheet / screen
+- structure it so real support/feedback integration can be added later
+
+==================================================
+TASK 7 — CREDIT PROFILE: CLICKABLE CREDIT UTILIZATION
+==================================================
+
+In Card List, inside the Credit Profile area, make the Credit Utilization element/button clickable.
+
+On press, open a modal, bottom sheet, or expandable detail panel showing:
+- each card name
+- each card utilization %
+- current balance per card
+- credit limit per card
+- combined credit limit
+- combined used credit
+- combined utilization %
+
+Requirements:
+- premium fintech presentation
+- easy to scan
+- responsive
+- avoid clutter
+
+==================================================
+TASK 8 — DEBUG CARD LIST SCREEN LAYOUT
+==================================================
+
+The Card List screen currently has layout/fit issues. Fix them.
+
+From visual inspection, likely problems include:
+- text wrapping badly
+- elements too large for screen width
+- poor spacing
+- awkward alignment
+- crowded credit profile area
+- some labels not centered correctly
+- content density too high on smaller devices
+
+Fix all responsive issues on this screen:
+- reduce font sizes where needed
+- improve line height
+- improve spacing and padding
+- fix overflow and clipping
+- keep cards elegant and readable
+- ensure Equifax / Experian / TransUnion area fits properly
+- ensure subscriptions and other text blocks fit correctly
+- preserve style but improve usability
+- make page look finished and intentional on mobile
+
+==================================================
+IMPLEMENTATION NOTES
+==================================================
+
+Please inspect the codebase first and identify:
+- Pay tab screen file
+- Card List screen file
+- Individual card detail component/screen
+- shared theme/styling files
+- transaction data models/helpers if any
+
+Then implement the changes in the correct files.
+
+Prefer creating/reusing components such as:
+- TransactionHistoryButton
+- TransactionStateToggle
+- TransactionCategoryDonut
+- UtilizationDetailsModal
+- SupportActionsSection
+
+If useful, add helper functions for:
+- counting cards
+- grouping transactions by pending/posted
+- calculating category percentages
+- calculating utilization totals
+
+==================================================
+EXPECTED OUTPUT
+==================================================
+
+After making the code changes, respond with:
+1. files changed
+2. components added
+3. main logic added
+4. layout bugs fixed
+5. any mock data or placeholder actions used
+6. anything still needing backend wiring
+
+Do not just give advice. Inspect the project and implement the changes now.

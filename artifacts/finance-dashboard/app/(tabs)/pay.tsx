@@ -2389,6 +2389,7 @@ export default function PayScreen() {
   const [successConfirmNum, setSuccessConfirmNum]       = useState("");
   const [receiptVisible, setReceiptVisible]             = useState(false);
   const [confettiVisible, setConfettiVisible]           = useState(false);
+  const [txStatus, setTxStatus]                         = useState<"pending" | "posted">("posted");
 
   // Scroll tracking
   const listRef = useRef<FlatList<any>>(null);
@@ -2400,6 +2401,8 @@ export default function PayScreen() {
   const thumbTopAnim = useRef(new Animated.Value(0)).current;
   const thumbHAnim = useRef(new Animated.Value(40)).current;
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const TX_PENDING_CUTOFF = useMemo(() => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), []);
 
   const filtered = useMemo(() => {
     return transactions
@@ -2413,8 +2416,13 @@ export default function PayScreen() {
         const d = new Date(t.date);
         return d.getFullYear() === txCycle.year && d.getMonth() === txCycle.month;
       })
+      .filter((t) => {
+        const d = new Date(t.date);
+        if (txStatus === "pending") return d >= TX_PENDING_CUTOFF;
+        return d < TX_PENDING_CUTOFF;
+      })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, filter, txCycle]);
+  }, [transactions, filter, txCycle, txStatus, TX_PENDING_CUTOFF]);
 
   const cardById = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
   const totalDebit  = useMemo(() => transactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0), [transactions]);
@@ -2550,6 +2558,23 @@ export default function PayScreen() {
                 <View style={styles.summaryCard}>
                   <Text style={styles.summaryLabel}>Money Out</Text>
                   <Text style={[styles.summaryAmt, { color: Colors.negative }]}>-{formatCurrency(totalDebit)}</Text>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      if (filtered.length > 0) {
+                        listRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: 10 });
+                      } else {
+                        listRef.current?.scrollToOffset({ offset: 9999, animated: true });
+                      }
+                    }}
+                    style={({ pressed }) => [styles.txHistoryBtn, pressed && { opacity: 0.75 }]}
+                  >
+                    <Feather name="list" size={11} color={Colors.primary} />
+                    <Text style={styles.txHistoryBtnText}>
+                      Transaction History ({transactions.length})
+                    </Text>
+                    <Feather name="chevron-right" size={11} color={Colors.primary} />
+                  </Pressable>
                 </View>
               </View>
 
@@ -2661,9 +2686,27 @@ export default function PayScreen() {
               </Pressable>
             </View>
 
-            {/* Transaction filter row */}
+            {/* Transaction History: pending/posted toggle + type filter */}
             <View style={styles.filterRow}>
-              <Text style={styles.sectionTitle}>Transaction History</Text>
+              <View style={styles.txStatusRow}>
+                <Text style={styles.sectionTitle}>Transaction History</Text>
+                <View style={styles.txStatusToggle}>
+                  {(["pending", "posted"] as const).map((s) => (
+                    <Pressable
+                      key={s}
+                      onPress={() => { Haptics.selectionAsync(); setTxStatus(s); }}
+                      style={[styles.txStatusBtn, txStatus === s && styles.txStatusBtnActive]}
+                    >
+                      {s === "pending" && (
+                        <View style={[styles.txStatusDot, { backgroundColor: txStatus === "pending" ? "#F59E0B" : Colors.textMuted }]} />
+                      )}
+                      <Text style={[styles.txStatusText, txStatus === s && styles.txStatusTextActive]}>
+                        {s === "pending" ? "Pending" : "Posted"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
               <View style={styles.filters}>
                 {FILTERS.map((f) => (
                   <Pressable
@@ -2969,6 +3012,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textPrimary,
   },
+  txHistoryBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(108,158,255,0.1)", borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, alignSelf: "flex-start",
+    borderWidth: 1, borderColor: "rgba(108,158,255,0.25)",
+  },
+  txHistoryBtnText: {
+    fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.primary,
+  },
+  txStatusRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, marginBottom: 6,
+  },
+  txStatusToggle: {
+    flexDirection: "row", gap: 4,
+    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 20, padding: 3,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
+  },
+  txStatusBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16,
+  },
+  txStatusBtnActive: { backgroundColor: Colors.primaryDark },
+  txStatusDot: { width: 6, height: 6, borderRadius: 3 },
+  txStatusText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textMuted },
+  txStatusTextActive: { color: "#fff" },
   filterRow: { marginBottom: 8, gap: 8 },
   filters: {
     flexDirection: "row",

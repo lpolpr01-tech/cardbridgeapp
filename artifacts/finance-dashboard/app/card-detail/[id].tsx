@@ -263,9 +263,240 @@ function SubscriptionsPanel({ cardId }: { cardId: string }) {
   );
 }
 
+// ─── Donut chart (dot-ring style) ────────────────────────────────────────────
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Food: "#FF6B8A",
+  Shopping: "#6C9EFF",
+  Travel: "#4ADEAA",
+  Transport: "#F59E0B",
+  Entertainment: "#C084FC",
+  Healthcare: "#34D399",
+  Income: "#F472B6",
+  Other: "#94A3B8",
+};
+
+function getCategoryGroup(cat: string): string {
+  const map: Record<string, string> = {
+    "Groceries": "Food",
+    "Food & Drink": "Food",
+    "Entertainment": "Entertainment",
+    "Shopping": "Shopping",
+    "Travel": "Travel",
+    "Transport": "Transport",
+    "Health": "Healthcare",
+    "Insurance": "Other",
+    "Income": "Income",
+    "Electronics": "Shopping",
+    "Home": "Other",
+    "Utilities": "Other",
+    "Dining": "Food",
+    "Subscriptions": "Other",
+  };
+  return map[cat] || "Other";
+}
+
+type CatSlice = { label: string; value: number; pct: number; color: string };
+
+function buildCategoryData(transactions: { type: string; category: string; amount: number }[]): CatSlice[] {
+  const debits = transactions.filter((t) => t.type === "debit");
+  const totals: Record<string, number> = {};
+  for (const t of debits) {
+    const g = getCategoryGroup(t.category);
+    totals[g] = (totals[g] ?? 0) + Math.abs(t.amount);
+  }
+  const total = Object.values(totals).reduce((s, v) => s + v, 0);
+  if (total === 0) return [];
+  return Object.entries(totals)
+    .map(([label, value]) => ({ label, value, pct: value / total, color: CATEGORY_COLORS[label] || "#94A3B8" }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function DonutChart({ slices, size = 170 }: { slices: CatSlice[]; size?: number }) {
+  const DOT_COUNT = 60;
+  const DOT_R = size / 2 - 16;
+  const DOT_SIZE = 5;
+
+  const dots: string[] = [];
+  for (const sl of slices) {
+    const count = Math.round(sl.pct * DOT_COUNT);
+    for (let i = 0; i < count; i++) dots.push(sl.color);
+  }
+  while (dots.length < DOT_COUNT) dots.push(slices[slices.length - 1]?.color || Colors.divider);
+  const trimmed = dots.slice(0, DOT_COUNT);
+
+  const topCat = slices[0];
+
+  return (
+    <View style={{ alignItems: "center", gap: 16 }}>
+      <View style={{ width: size, height: size }}>
+        {trimmed.map((color, i) => {
+          const angle = ((i * 360) / DOT_COUNT - 90) * (Math.PI / 180);
+          const x = size / 2 + DOT_R * Math.cos(angle) - DOT_SIZE / 2;
+          const y = size / 2 + DOT_R * Math.sin(angle) - DOT_SIZE / 2;
+          return (
+            <View
+              key={i}
+              style={{
+                position: "absolute", left: x, top: y,
+                width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2,
+                backgroundColor: color, opacity: 0.92,
+              }}
+            />
+          );
+        })}
+        <View
+          style={{
+            position: "absolute",
+            left: 28, top: 28, right: 28, bottom: 28,
+            borderRadius: (size - 56) / 2,
+            backgroundColor: Colors.background,
+            alignItems: "center", justifyContent: "center",
+          }}
+        >
+          {topCat ? (
+            <>
+              <Text style={{ fontFamily: "Inter_700Bold", fontSize: 13, color: "#fff" }}>{topCat.label}</Text>
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 18, color: topCat.color, marginTop: 2 }}>
+                {Math.round(topCat.pct * 100)}%
+              </Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginTop: 1 }}>
+                top spend
+              </Text>
+            </>
+          ) : (
+            <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted }}>No data</Text>
+          )}
+        </View>
+      </View>
+
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 8, justifyContent: "center" }}>
+        {slices.slice(0, 6).map((sl) => (
+          <View key={sl.label} style={{ flexDirection: "row", alignItems: "center", gap: 6, minWidth: "42%" }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sl.color }} />
+            <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, flex: 1 }}>
+              {sl.label}
+            </Text>
+            <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textPrimary }}>
+              {Math.round(sl.pct * 100)}%
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Transactions tab panel ───────────────────────────────────────────────────
+
+const TX_PENDING_CUTOFF = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+function TransactionsPanel({ cardId }: { cardId: string }) {
+  const { transactions } = useFinance();
+  const cardTxs = transactions.filter((t) => t.cardId === cardId);
+  const [txStatus, setTxStatus] = useState<"pending" | "posted">("posted");
+
+  const slices = buildCategoryData(cardTxs);
+
+  const shown = cardTxs
+    .filter((t) => {
+      const d = new Date(t.date);
+      return txStatus === "pending" ? d >= TX_PENDING_CUTOFF : d < TX_PENDING_CUTOFF;
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return (
+    <View style={[styles.infoPage, { paddingTop: 20 }]}>
+      {slices.length > 0 ? (
+        <>
+          <Text style={txp.chartTitle}>Spending by Category</Text>
+          <DonutChart slices={slices} />
+        </>
+      ) : (
+        <View style={txp.emptyChart}>
+          <Feather name="pie-chart" size={28} color={Colors.textMuted} />
+          <Text style={txp.emptyText}>No spending data yet</Text>
+        </View>
+      )}
+
+      <View style={txp.divider} />
+
+      <View style={txp.toggleRow}>
+        <Text style={txp.toggleLabel}>Transactions</Text>
+        <View style={txp.toggle}>
+          {(["pending", "posted"] as const).map((s) => (
+            <Pressable
+              key={s}
+              onPress={() => setTxStatus(s)}
+              style={[txp.toggleBtn, txStatus === s && txp.toggleBtnActive]}
+            >
+              {s === "pending" && (
+                <View style={[txp.dot, { backgroundColor: txStatus === "pending" ? "#F59E0B" : Colors.textMuted }]} />
+              )}
+              <Text style={[txp.toggleText, txStatus === s && txp.toggleTextActive]}>
+                {s === "pending" ? "Pending" : "Posted"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {shown.length === 0 ? (
+        <View style={txp.emptyList}>
+          <Feather name="inbox" size={22} color={Colors.textMuted} />
+          <Text style={txp.emptyText}>
+            No {txStatus} transactions
+          </Text>
+        </View>
+      ) : (
+        shown.map((t, i) => (
+          <View key={t.id} style={[txp.txRow, i < shown.length - 1 && txp.txBorder]}>
+            <View style={txp.txIcon}>
+              <Text style={{ fontSize: 18 }}>{t.icon}</Text>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={txp.txTitle} numberOfLines={1}>{t.title}</Text>
+              <Text style={txp.txCat}>{t.category}  ·  {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</Text>
+            </View>
+            <Text style={[txp.txAmt, { color: t.type === "credit" ? Colors.positive : Colors.negative }]}>
+              {t.type === "credit" ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
+            </Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+const txp = StyleSheet.create({
+  chartTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textPrimary, textAlign: "center", marginBottom: 16 },
+  emptyChart: { alignItems: "center", gap: 8, paddingVertical: 24 },
+  divider: { height: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 20 },
+  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  toggleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textPrimary },
+  toggle: {
+    flexDirection: "row", gap: 3,
+    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 16, padding: 3,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
+  },
+  toggleBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 13 },
+  toggleBtnActive: { backgroundColor: Colors.primaryDark },
+  dot: { width: 5, height: 5, borderRadius: 2.5 },
+  toggleText: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.textMuted },
+  toggleTextActive: { color: "#fff" },
+  emptyList: { alignItems: "center", gap: 8, paddingVertical: 20 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textMuted },
+  txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  txBorder: { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)" },
+  txIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  txTitle: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textPrimary },
+  txCat: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted },
+  txAmt: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+});
+
 // ─── Horizontally scrollable info panel ──────────────────────────────────────
 
-const TAB_ICONS: Record<number, any> = { 0: "gift", 1: "calendar", 2: "repeat" };
+const TAB_ICONS: Record<number, any> = { 0: "gift", 1: "calendar", 2: "repeat", 3: "activity" };
 
 function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; cardId: string; balance: number }) {
   const [page, setPage] = useState(0);
@@ -276,7 +507,7 @@ function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; ca
     setPage(newPage);
   };
 
-  const tabs = ["Rewards & Benefits", "Billing Dates", "Subscriptions"];
+  const tabs = ["Rewards & Benefits", "Billing Dates", "Subscriptions", "Transactions"];
 
   return (
     <View style={styles.infoScrollWrap}>
@@ -315,6 +546,7 @@ function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; ca
         <RewardsPanel rewards={rewards} />
         <BillingPanel cardId={cardId} balance={balance} />
         <SubscriptionsPanel cardId={cardId} />
+        <TransactionsPanel cardId={cardId} />
       </ScrollView>
 
       {/* Page dots */}
