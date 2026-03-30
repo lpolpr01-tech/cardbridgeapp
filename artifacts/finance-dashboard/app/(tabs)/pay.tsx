@@ -2568,18 +2568,7 @@ export default function PayScreen() {
               {/* Scheduled payments */}
               {scheduledPayments.length > 0 && (
                 <>
-                  <View style={styles.scheduledHeaderRow}>
-                    <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Scheduled Payments</Text>
-                    <Pressable
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        listRef.current?.scrollToOffset({ offset: 9999, animated: true });
-                      }}
-                      style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-                    >
-                      <Text style={styles.txHistoryLabel}>Transaction History</Text>
-                    </Pressable>
-                  </View>
+                  <Text style={styles.sectionTitle}>Scheduled Payments</Text>
                   {scheduledPayments.map((sp) => {
                     const totalAmt = Object.values(sp.amounts).reduce((s, a) => s + a, 0);
                     return (
@@ -2908,19 +2897,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     paddingHorizontal: 20,
     marginBottom: 10,
-  },
-  scheduledHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingRight: 20,
-    marginBottom: 10,
-  },
-  txHistoryLabel: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    color: Colors.primary,
-    letterSpacing: 0.2,
   },
   scheduledCard: {
     marginHorizontal: 20,

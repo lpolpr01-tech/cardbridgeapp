@@ -319,19 +319,6 @@ function NoDataCard() {
 
 // ─── 1. Credit Score Overview Card ───────────────────────────────────────────
 
-function ScoreArc({ score, color }: { score: number | null; color: string }) {
-  if (score === null) return <Text style={[cs.scoreNum, { color: Colors.textMuted }]}>—</Text>;
-  const pct = (score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN);
-  return (
-    <View style={cs.arcWrap}>
-      <View style={cs.arcBg}>
-        <View style={[cs.arcFill, { width: `${pct * 100}%` as any, backgroundColor: color }]} />
-      </View>
-      <Text style={[cs.scoreNum, { color }]}>{score}</Text>
-    </View>
-  );
-}
-
 export function CreditScoreOverviewCard({ data }: { data: CreditProfileData }) {
   const available = data.bureaus.filter((b) => b.score !== null);
   const avgScore  = available.length
@@ -374,7 +361,7 @@ export function CreditScoreOverviewCard({ data }: { data: CreditProfileData }) {
           </View>
         </View>
 
-        {/* Gradient bar */}
+        {/* Compact thermometer — average score position */}
         {avgScore !== null && (
           <View style={cs.barWrap}>
             <LinearGradient
@@ -386,64 +373,54 @@ export function CreditScoreOverviewCard({ data }: { data: CreditProfileData }) {
               <View style={[cs.barDot, { borderColor: avgColor }]} />
             </View>
             <View style={cs.barLabels}>
-              {["300", "500", "650", "750", "850"].map((l) => (
+              {["300", "580", "670", "740", "850"].map((l) => (
                 <Text key={l} style={cs.barLabel}>{l}</Text>
               ))}
             </View>
           </View>
         )}
 
-        {/* Bureau layout: Equifax + Experian top row, TransUnion below centered */}
-        {(() => {
-          const eq = data.bureaus.find((b) => b.name === "Equifax");
-          const ex = data.bureaus.find((b) => b.name === "Experian");
-          const tu = data.bureaus.find((b) => b.name === "TransUnion");
-          const renderBureau = (b: typeof eq) => {
-            if (!b) return null;
+        {/* Bureau scores — vertical stack: one row per bureau */}
+        <View style={cs.bureauSection}>
+          {data.bureaus.map((b, i) => {
+            const pct = b.score !== null ? ((b.score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100 : 0;
+            const catColor = getCategoryColor(b.score);
             return (
-              <View key={b.name} style={cs.bureauItem}>
-                <Text style={cs.bureauName}>{b.name}</Text>
-                <ScoreArc score={b.score} color={b.color} />
-                {b.score !== null && (
+              <React.Fragment key={b.name}>
+                {i > 0 && <View style={cs.bureauRowDivider} />}
+                <View style={cs.bureauRow}>
+                  <Text style={cs.bureauName}>{b.name}</Text>
+                  <Text style={[cs.bureauScore, { color: b.color }]}>
+                    {b.score ?? "—"}
+                  </Text>
                   <View style={cs.bureauBarBg}>
-                    <View style={[cs.bureauBarFill, {
-                      width: `${((b.score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100}%` as any,
-                      backgroundColor: b.color,
-                    }]} />
+                    {b.score !== null && (
+                      <View style={[cs.bureauBarFill, {
+                        width: `${pct}%` as any,
+                        backgroundColor: b.color,
+                      }]} />
+                    )}
                   </View>
-                )}
-                <Text style={[cs.bureauCategory, { color: getCategoryColor(b.score) }]}>
-                  {getCategory(b.score)}
-                </Text>
-                {b.change !== undefined && b.change !== 0 && (
-                  <View style={[cs.changeChip, { backgroundColor: b.change > 0 ? "rgba(74,222,170,0.15)" : "rgba(255,107,138,0.15)" }]}>
-                    <Feather name={b.change > 0 ? "arrow-up" : "arrow-down"} size={9} color={b.change > 0 ? Colors.positive : Colors.negative} />
-                    <Text style={[cs.changeText, { color: b.change > 0 ? Colors.positive : Colors.negative }]}>
-                      {Math.abs(b.change)}
-                    </Text>
-                  </View>
-                )}
-              </View>
+                  <Text style={[cs.bureauCategory, { color: catColor }]}>
+                    {getCategory(b.score)}
+                  </Text>
+                  {b.change !== undefined && b.change !== 0 && (
+                    <View style={[cs.changeChip, { backgroundColor: b.change > 0 ? "rgba(74,222,170,0.13)" : "rgba(255,107,138,0.13)" }]}>
+                      <Feather
+                        name={b.change > 0 ? "trending-up" : "trending-down"}
+                        size={9}
+                        color={b.change > 0 ? Colors.positive : Colors.negative}
+                      />
+                      <Text style={[cs.changeText, { color: b.change > 0 ? Colors.positive : Colors.negative }]}>
+                        {b.change > 0 ? "+" : ""}{b.change}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </React.Fragment>
             );
-          };
-          return (
-            <View style={cs.bureauSection}>
-              <View style={cs.bureauxTopRow}>
-                {renderBureau(eq)}
-                {eq && ex && <View style={cs.bureauDivider} />}
-                {renderBureau(ex)}
-              </View>
-              {tu && (
-                <>
-                  <View style={cs.bureauHorizontalDivider} />
-                  <View style={cs.bureauxBottomRow}>
-                    {renderBureau(tu)}
-                  </View>
-                </>
-              )}
-            </View>
-          );
-        })()}
+          })}
+        </View>
 
         {/* Footer */}
         <View style={cs.footer}>
@@ -734,15 +711,18 @@ export function CreditHealthCard({ data }: { data: CreditHealthData }) {
           <HealthRow
             icon="search"
             label="Recent Inquiries"
-            value={String(data.recentInquiries)}
-            sub={data.recentInquiries <= 2 ? "Low impact" : "May lower score slightly"}
-            barColor={data.recentInquiries <= 2 ? Colors.positive : data.recentInquiries <= 4 ? "#FBBF24" : Colors.negative}
+            value={data.recentInquiries === 0 ? "None" : `${data.recentInquiries} inquiry${data.recentInquiries !== 1 ? "s" : ""}`}
+            sub={data.recentInquiries === 0 ? "No recent impact" : data.recentInquiries <= 2 ? "Low impact — fading in 12 mo" : "Moderate impact on score"}
+            barPct={Math.min((data.recentInquiries / 6) * 100, 100)}
+            barColor={data.recentInquiries === 0 ? Colors.positive : data.recentInquiries <= 2 ? "#FBBF24" : Colors.negative}
           />
           <View style={sh.divider} />
           <HealthRow
             icon="alert-circle"
             label="Derogatory Marks"
-            value={data.derogatoryMarks === 0 ? "None reported" : String(data.derogatoryMarks)}
+            value={data.derogatoryMarks === 0 ? "Clear" : `${data.derogatoryMarks} mark${data.derogatoryMarks !== 1 ? "s" : ""}`}
+            sub={data.derogatoryMarks === 0 ? "No negative records on file" : "Negative impact — contact bureau to dispute"}
+            barPct={data.derogatoryMarks === 0 ? 100 : Math.min((data.derogatoryMarks / 3) * 100, 100)}
             barColor={data.derogatoryMarks === 0 ? Colors.positive : Colors.negative}
           />
         </View>
@@ -770,12 +750,13 @@ function DebtLine({ label, amount, color }: { label: string; amount: number; col
 
 // ── Debt Summary Drill-Down Modal ─────────────────────────────────────────────
 
+// TODO: Replace static labels with lender names fetched from connected account API
 const DEBT_SEGMENTS = [
-  { key: "creditCards",   label: "Credit Cards",    color: "#9B5CF5" },
-  { key: "autoLoans",     label: "Auto Loans",      color: "#3E8EDD" },
-  { key: "personalLoans", label: "Personal Loans",  color: "#F59E0B" },
-  { key: "studentLoans",  label: "Student Loans",   color: "#4ADEAA" },
-  { key: "other",         label: "Other",           color: "#94A3B8" },
+  { key: "creditCards",   label: "Chase Visa",   color: "#9B5CF5" },
+  { key: "autoLoans",     label: "Wells Auto",   color: "#3E8EDD" },
+  { key: "personalLoans", label: "Upstart Loan", color: "#F59E0B" },
+  { key: "studentLoans",  label: "Navient Edu",  color: "#4ADEAA" },
+  { key: "other",         label: "Other Debt",   color: "#94A3B8" },
 ];
 
 function DebtDrillDownModal({ visible, onClose, data }: { visible: boolean; onClose: () => void; data: DebtSummaryData }) {
@@ -889,8 +870,11 @@ export function DebtSummaryCard({ data }: { data: DebtSummaryData }) {
           <View style={sh.divider} />
           <View style={ds.keyRow}>
             <Feather name="credit-card" size={13} color={Colors.negative} />
-            <Text style={ds.keyLabel}>Highest Balance</Text>
-            <Text style={[ds.keyVal, { color: Colors.negative }]}>{data.highestBalanceName} · {fmtCurrency(data.highestBalanceAmt)}</Text>
+            <Text style={ds.keyLabel} numberOfLines={1}>Highest Balance</Text>
+            <View style={{ alignItems: "flex-end", gap: 1 }}>
+              <Text style={[ds.keyVal, { color: Colors.negative }]} numberOfLines={1}>{data.highestBalanceName}</Text>
+              <Text style={[ds.keyVal, { color: Colors.negative, fontSize: 11, fontFamily: "Inter_400Regular" }]}>{fmtCurrency(data.highestBalanceAmt)}</Text>
+            </View>
           </View>
           {data.debtToLimitRatio !== undefined && (
             <>
@@ -916,11 +900,14 @@ export function DebtSummaryCard({ data }: { data: DebtSummaryData }) {
         </Pressable>
         {expanded && (
           <View style={ds.breakdown}>
-            <DebtLine label="Credit Cards"    amount={data.creditCards}   color="#9B5CF5" />
-            <DebtLine label="Auto Loans"      amount={data.autoLoans}     color="#3E8EDD" />
-            <DebtLine label="Personal Loans"  amount={data.personalLoans} color="#F59E0B" />
-            <DebtLine label="Student Loans"   amount={data.studentLoans}  color="#4ADEAA" />
-            <DebtLine label="Other"           amount={data.other}         color={Colors.textMuted} />
+            {DEBT_SEGMENTS.map((seg) => (
+              <DebtLine
+                key={seg.key}
+                label={seg.label}
+                amount={(data as any)[seg.key] as number}
+                color={seg.color}
+              />
+            ))}
           </View>
         )}
         <PrivacyBadge />
@@ -1285,14 +1272,14 @@ const root = StyleSheet.create({
 const sh = StyleSheet.create({
   card: {
     marginHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 8,
     backgroundColor: "rgba(28,14,70,0.88)",
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.11)",
     elevation: 8,
-    padding: 18,
-    gap: 14,
+    padding: 16,
+    gap: 12,
   },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   cardHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -1327,32 +1314,28 @@ const cs = StyleSheet.create({
   updatedBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(74,222,170,0.1)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(74,222,170,0.2)" },
   updatedDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: Colors.positive },
   updatedText: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.positive },
-  avgRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  avgRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   avgLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   avgRight: { flexDirection: "row", alignItems: "baseline", gap: 8 },
-  avgScore: { fontFamily: "Inter_700Bold", fontSize: 28 },
+  avgScore: { fontFamily: "Inter_700Bold", fontSize: 26 },
   avgCategory: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  barWrap: { marginBottom: 16, position: "relative" },
-  barTrack: { height: 8, borderRadius: 4, marginBottom: 4 },
-  barIndicator: { position: "absolute", top: -4, alignItems: "center" },
-  barDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#fff", borderWidth: 3, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4, elevation: 4, marginLeft: -8 },
-  barLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
+  // Compact thermometer bar
+  barWrap: { marginBottom: 10, position: "relative" },
+  barTrack: { height: 5, borderRadius: 2.5, marginBottom: 3 },
+  barIndicator: { position: "absolute", top: -3.5, alignItems: "center" },
+  barDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#fff", borderWidth: 2.5, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 4, marginLeft: -6 },
+  barLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
   barLabel: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted },
+  // Bureau vertical stack
   bureauSection: { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)", marginHorizontal: -18 },
-  bureauxTopRow: { flexDirection: "row" },
-  bureauxBottomRow: { flexDirection: "row", justifyContent: "center", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
-  bureauHorizontalDivider: {},
-  bureauItem: { flex: 1, alignItems: "center", paddingVertical: 14, paddingHorizontal: 4, gap: 5 },
-  bureauDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.07)", marginVertical: 10 },
-  bureauName: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
-  bureauBarBg: { width: "70%", height: 4, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" },
-  bureauBarFill: { height: 4, borderRadius: 2 },
-  bureauCategory: { fontFamily: "Inter_500Medium", fontSize: 10 },
-  arcWrap: { alignItems: "center", gap: 4 },
-  arcBg: { width: 48, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
-  arcFill: { height: 6, borderRadius: 3 },
-  scoreNum: { fontFamily: "Inter_700Bold", fontSize: 20 },
-  changeChip: { flexDirection: "row", alignItems: "center", gap: 2, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
+  bureauRow: { flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingHorizontal: 18, gap: 10 },
+  bureauRowDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginHorizontal: 18 },
+  bureauName: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.textMuted, width: 84 },
+  bureauScore: { fontFamily: "Inter_700Bold", fontSize: 16, width: 40, textAlign: "right" },
+  bureauBarBg: { flex: 1, height: 5, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 2.5, overflow: "hidden" },
+  bureauBarFill: { height: 5, borderRadius: 2.5 },
+  bureauCategory: { fontFamily: "Inter_500Medium", fontSize: 11, width: 56, textAlign: "right" },
+  changeChip: { flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
   changeText: { fontFamily: "Inter_700Bold", fontSize: 9 },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
   disclaimer: { fontFamily: "Inter_400Regular", fontSize: 9.5, color: Colors.textMuted, lineHeight: 14, flex: 1, textAlign: "right" },
@@ -1363,7 +1346,7 @@ const hc = StyleSheet.create({
   statusPill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1 },
   statusDot: { width: 5, height: 5, borderRadius: 2.5 },
   statusText: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 8 },
   rowIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   rowBody: { flex: 1, gap: 4 },
   rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -1376,15 +1359,15 @@ const hc = StyleSheet.create({
 
 // Debt Summary styles
 const ds = StyleSheet.create({
-  hero: { alignItems: "center", paddingVertical: 4 },
-  heroTotal: { fontFamily: "Inter_700Bold", fontSize: 32, color: Colors.textPrimary, letterSpacing: -0.5 },
-  heroLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  hero: { alignItems: "center", paddingVertical: 2 },
+  heroTotal: { fontFamily: "Inter_700Bold", fontSize: 28, color: Colors.textPrimary, letterSpacing: -0.5 },
+  heroLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted, marginTop: 1 },
   grid: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
-  stat: { flex: 1, alignItems: "center", paddingVertical: 12, gap: 3 },
+  stat: { flex: 1, alignItems: "center", paddingVertical: 10, gap: 2 },
   statDiv: { width: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 10 },
   statValue: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.textPrimary },
   statLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textMuted },
-  keyRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10 },
+  keyRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
   keyLabel: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, flex: 1 },
   keyVal: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textPrimary },
   expandBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", marginTop: 4 },
