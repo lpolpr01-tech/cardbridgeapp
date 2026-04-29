@@ -1174,42 +1174,57 @@ export default function OptionsScreen() {
         </View>
 
         <SectionLabel text="Linked Bank Accounts" />
-        <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          {bankAccounts.map((bank, idx) => (
-            <React.Fragment key={bank.id}>
-              {idx > 0 && <View style={styles.rowDivider} />}
-              <View style={styles.settingRow}>
-                <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.1)" }]}>
-                  <Feather name="database" size={18} color={Colors.positive} />
+        {bankAccounts.length === 0 ? (
+          <View style={[styles.settingsGroup, GLASS_INLINE, bankS.emptyWrap]}>
+            <Feather name="link" size={28} color={Colors.primary} style={{ marginBottom: 8 }} />
+            <Text style={bankS.emptyTitle}>No bank accounts linked</Text>
+            <Text style={bankS.emptySubtitle}>Connect a bank to enable ACH payments and direct transfers.</Text>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); setAddBankVisible(true); }}
+              style={({ pressed }) => [bankS.linkBtn, pressed && { opacity: 0.85 }]}
+            >
+              <Feather name="plus" size={15} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={bankS.linkBtnText}>Link Bank Account</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={[styles.settingsGroup, GLASS_INLINE]}>
+            {bankAccounts.map((bank, idx) => (
+              <React.Fragment key={bank.id}>
+                {idx > 0 && <View style={styles.rowDivider} />}
+                <View style={styles.settingRow}>
+                  <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.1)" }]}>
+                    <Feather name="database" size={18} color={Colors.positive} />
+                  </View>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingLabel}>{bank.bankName}</Text>
+                    <Text style={styles.settingSubtitle}>
+                      {bank.accountType.charAt(0).toUpperCase() + bank.accountType.slice(1)} ···{bank.lastFour}
+                      {bank.nickname ? `  ·  ${bank.nickname}` : ""}
+                    </Text>
+                  </View>
+                  <View style={styles.achBadge}>
+                    <Text style={styles.achBadgeText}>ACH</Text>
+                  </View>
                 </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>{bank.bankName}</Text>
-                  <Text style={styles.settingSubtitle}>
-                    {bank.accountType.charAt(0).toUpperCase() + bank.accountType.slice(1)} ···{bank.lastFour}
-                    {bank.nickname ? `  ·  ${bank.nickname}` : ""}
-                  </Text>
-                </View>
-                <View style={styles.achBadge}>
-                  <Text style={styles.achBadgeText}>ACH</Text>
-                </View>
+              </React.Fragment>
+            ))}
+            <View style={styles.rowDivider} />
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); setAddBankVisible(true); }}
+              style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
+            >
+              <View style={[styles.settingIcon, { backgroundColor: "rgba(108,158,255,0.1)" }]}>
+                <Feather name="plus-circle" size={18} color={Colors.primary} />
               </View>
-            </React.Fragment>
-          ))}
-          {bankAccounts.length > 0 && <View style={styles.rowDivider} />}
-          <Pressable
-            onPress={() => { Haptics.selectionAsync(); setAddBankVisible(true); }}
-            style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: "rgba(108,158,255,0.1)" }]}>
-              <Feather name="plus-circle" size={18} color={Colors.primary} />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, { color: Colors.primary }]}>Link New Bank Account</Text>
-              <Text style={styles.settingSubtitle}>ACH payments · secure transfer</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={Colors.textMuted} />
-          </Pressable>
-        </View>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: Colors.primary }]}>Add Another Bank Account</Text>
+                <Text style={styles.settingSubtitle}>ACH payments · secure transfer</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+        )}
 
         <SectionLabel text="Security" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
@@ -1271,6 +1286,45 @@ export default function OptionsScreen() {
     </LinearGradient>
   );
 }
+
+// ─── Bank empty-state styles ──────────────────────────────────────────────────
+
+const bankS = StyleSheet.create({
+  emptyWrap: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: "center",
+    lineHeight: 17,
+    marginBottom: 8,
+  },
+  linkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    marginTop: 4,
+  },
+  linkBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#fff",
+  },
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 

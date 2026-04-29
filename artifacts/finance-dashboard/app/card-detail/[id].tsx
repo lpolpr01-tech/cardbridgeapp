@@ -4,6 +4,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Dimensions,
+  Image,
+  Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   PanResponder,
@@ -18,6 +20,85 @@ import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
 import type { CardRewards } from "@/context/FinanceContext";
 import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
+
+// ─── Merchant logo / emoji helpers ────────────────────────────────────────────
+
+const MERCHANT_DOMAINS: Record<string, string> = {
+  Netflix: "netflix.com",
+  Amazon: "amazon.com",
+  Spotify: "spotify.com",
+  Apple: "apple.com",
+  YouTube: "youtube.com",
+  Starbucks: "starbucks.com",
+  Walmart: "walmart.com",
+  Uber: "uber.com",
+  DoorDash: "doordash.com",
+  GitHub: "github.com",
+  Xbox: "xbox.com",
+};
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  Entertainment: "🎬",
+  "Food & Drink": "☕",
+  Food: "☕",
+  Dining: "☕",
+  Groceries: "🛒",
+  Transport: "🚗",
+  Shopping: "🛍️",
+  Income: "💰",
+  Gaming: "🎮",
+  Developer: "💻",
+  Healthcare: "🏥",
+  Health: "🏥",
+  Travel: "✈️",
+  Music: "🎵",
+  Video: "📺",
+  Storage: "☁️",
+  Creative: "🎨",
+  News: "📰",
+  Education: "🦉",
+  Security: "🔑",
+  Other: "💳",
+};
+
+const CANCEL_URLS: Record<string, string> = {
+  Netflix: "https://www.netflix.com/cancelplan",
+  Spotify: "https://www.spotify.com/account/subscription/cancel",
+  "Amazon Prime": "https://www.amazon.com/mc/optOutEligibility",
+  "YouTube Premium": "https://myaccount.google.com/payments-and-subscriptions",
+  "Xbox Game Pass": "https://account.microsoft.com/services",
+  "GitHub Pro": "https://github.com/settings/billing",
+};
+
+function getCancelUrl(name: string): string {
+  if (CANCEL_URLS[name]) return CANCEL_URLS[name];
+  return `https://www.google.com/search?q=cancel+${encodeURIComponent(name)}+subscription`;
+}
+
+function MerchantLogo({ title, category, icon }: { title: string; category: string; icon: string }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const domain = Object.entries(MERCHANT_DOMAINS).find(
+    ([key]) => title.toLowerCase().includes(key.toLowerCase())
+  )?.[1];
+  const emoji = icon || CATEGORY_EMOJI[category] || "💳";
+
+  if (domain && !imgFailed) {
+    return (
+      <View style={txp.txIcon}>
+        <Image
+          source={{ uri: `https://logo.clearbit.com/${domain}` }}
+          style={{ width: 22, height: 22, borderRadius: 4 }}
+          onError={() => setImgFailed(true)}
+        />
+      </View>
+    );
+  }
+  return (
+    <View style={txp.txIcon}>
+      <Text style={{ fontSize: 17 }}>{emoji}</Text>
+    </View>
+  );
+}
 
 const { width } = Dimensions.get("window");
 const PANEL_WIDTH = width - 40;
@@ -75,6 +156,10 @@ function CardTypeBadge({ type }: { type: "visa" | "mastercard" | "amex" }) {
 // ─── Rewards panel ────────────────────────────────────────────────────────────
 
 function RewardsPanel({ rewards }: { rewards: CardRewards }) {
+  const threshold = rewards.type === "points" || rewards.type === "both" ? 10000 : 100;
+  const earned = rewards.cashbackTotal ?? (rewards.pointsTotal ? rewards.pointsTotal / 100 : 0);
+  const progressPct = Math.min((earned / threshold) * 100, 100);
+
   return (
     <View style={styles.infoPage}>
       <View style={styles.rewardsPanelHeader}>
@@ -82,6 +167,22 @@ function RewardsPanel({ rewards }: { rewards: CardRewards }) {
         <Text style={styles.rewardsPanelTitle}>Rewards & Benefits</Text>
       </View>
       <Text style={styles.rewardsDescription}>{rewards.description}</Text>
+
+      <View style={rwdS.summaryBanner}>
+        <View style={rwdS.summaryTop}>
+          <Text style={rwdS.summaryLabel}>Rewards Progress</Text>
+          <Text style={rwdS.summaryPct}>{Math.round(progressPct)}%</Text>
+        </View>
+        <View style={rwdS.progTrack}>
+          <View style={[rwdS.progFill, { width: `${progressPct}%` as any, backgroundColor: Colors.primary }]} />
+        </View>
+        <Text style={rwdS.summaryHint}>
+          {progressPct >= 100
+            ? "🎉 Threshold reached — reward available!"
+            : `${(threshold - earned).toFixed(rewards.type === "points" || rewards.type === "both" ? 0 : 2)} more to reach next reward`}
+        </Text>
+      </View>
+
       <View style={styles.rewardsGrid}>
         {(rewards.type === "cashback" || rewards.type === "both") && (
           <View style={styles.rewardBox}>
@@ -130,12 +231,29 @@ function RewardsPanel({ rewards }: { rewards: CardRewards }) {
 
 // ─── Billing panel ────────────────────────────────────────────────────────────
 
+function getUrgencyStyle(daysUntil: number): { color: string; label: string; bg: string } {
+  if (daysUntil < 0) return { color: "#FF2D55", label: "OVERDUE", bg: "rgba(255,45,85,0.15)" };
+  if (daysUntil <= 2) return { color: "#FF2D55", label: `${daysUntil}d left`, bg: "rgba(255,45,85,0.12)" };
+  if (daysUntil <= 6) return { color: "#F59E0B", label: `${daysUntil}d left`, bg: "rgba(245,158,11,0.12)" };
+  return { color: "#4ADEAA", label: `${daysUntil}d`, bg: "rgba(74,222,170,0.12)" };
+}
+
+function getDaysUntil(day: number): number {
+  const now = new Date();
+  const today = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  if (day >= today) return day - today;
+  return daysInMonth - today + day;
+}
+
 function BillingPanel({ cardId, balance }: { cardId: string; balance: number }) {
   const info = BILLING_DATA[cardId] ?? { dueDay: 15, statementOpen: 1, statementClose: 28, minPayment: 25 };
 
   const dueDate = getNextDate(info.dueDay);
   const openDate = getNextDate(info.statementOpen);
   const closeDate = getNextDate(info.statementClose);
+  const daysUntilDue = getDaysUntil(info.dueDay);
+  const urgency = getUrgencyStyle(daysUntilDue);
 
   const billingItems = [
     {
@@ -178,9 +296,15 @@ function BillingPanel({ cardId, balance }: { cardId: string; balance: number }) 
 
   return (
     <View style={styles.infoPage}>
-      <View style={styles.rewardsPanelHeader}>
-        <Feather name="calendar" size={16} color={Colors.primary} />
-        <Text style={styles.rewardsPanelTitle}>Billing Dates</Text>
+      <View style={[styles.rewardsPanelHeader, { justifyContent: "space-between" }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Feather name="calendar" size={16} color={Colors.primary} />
+          <Text style={styles.rewardsPanelTitle}>Billing Dates</Text>
+        </View>
+        <View style={[bill.urgencyBadge, { backgroundColor: urgency.bg }]}>
+          <View style={[bill.urgencyDot, { backgroundColor: urgency.color }]} />
+          <Text style={[bill.urgencyText, { color: urgency.color }]}>{urgency.label}</Text>
+        </View>
       </View>
 
       <View style={bill.grid}>
@@ -247,15 +371,27 @@ function SubscriptionsPanel({ cardId }: { cardId: string }) {
                 <View style={subPnl.info}>
                   <Text style={subPnl.name}>{sub.name}</Text>
                   <Text style={subPnl.category}>{sub.category} · {sub.cycle}</Text>
+                  <Text style={subPnl.nextDate}>Next {formatDate(sub.nextDate)}</Text>
                 </View>
                 <View style={subPnl.right}>
                   <Text style={subPnl.amount}>${sub.amount.toFixed(2)}</Text>
-                  <Text style={subPnl.nextDate}>Next {formatDate(sub.nextDate)}</Text>
+                  <Pressable
+                    onPress={() => Linking.openURL(getCancelUrl(sub.name))}
+                    style={({ pressed }) => [subPnl.cancelBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={subPnl.cancelText}>Cancel</Text>
+                  </Pressable>
                 </View>
               </View>
               {i < subs.length - 1 && <View style={subPnl.sep} />}
             </View>
           ))}
+          <View style={subPnl.disclaimer}>
+            <Feather name="info" size={11} color={Colors.textMuted} />
+            <Text style={subPnl.disclaimerText}>
+              CardFlow does not cancel subscriptions on your behalf. You will be redirected to the provider's official cancellation page.
+            </Text>
+          </View>
         </>
       )}
     </View>
@@ -462,14 +598,12 @@ function TransactionsPanel({ cardId }: { cardId: string }) {
       ) : (
         shown.map((t, i) => (
           <View key={t.id} style={[txp.txRow, i < shown.length - 1 && txp.txBorder]}>
-            <View style={txp.txIcon}>
-              <Text style={{ fontSize: 18 }}>{t.icon}</Text>
+            <MerchantLogo title={t.title} category={t.category} icon={t.icon} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={txp.txTitle} numberOfLines={1} ellipsizeMode="tail">{t.title}</Text>
+              <Text style={txp.txCat} numberOfLines={1}>{t.category} · {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</Text>
             </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={txp.txTitle} numberOfLines={1}>{t.title}</Text>
-              <Text style={txp.txCat}>{t.category}  ·  {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</Text>
-            </View>
-            <Text style={[txp.txAmt, { color: t.type === "credit" ? Colors.positive : Colors.negative }]}>
+            <Text style={[txp.txAmt, { color: t.type === "credit" ? Colors.positive : Colors.negative, flexShrink: 0 }]}>
               {t.type === "credit" ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
             </Text>
           </View>
@@ -794,6 +928,51 @@ const styles = StyleSheet.create({
 
 // ─── Billing styles ───────────────────────────────────────────────────────────
 
+const rwdS = StyleSheet.create({
+  summaryBanner: {
+    backgroundColor: "rgba(79,127,255,0.08)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(79,127,255,0.18)",
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
+  },
+  summaryTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  summaryPct: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  progTrack: {
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  summaryHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 15,
+  },
+});
+
 const bill = StyleSheet.create({
   grid: {
     flexDirection: "row",
@@ -852,6 +1031,24 @@ const bill = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 16,
     color: Colors.textPrimary,
+  },
+  urgencyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  urgencyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  urgencyText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 0.3,
   },
 });
 
@@ -926,5 +1123,34 @@ const subPnl = StyleSheet.create({
     backgroundColor: Colors.divider,
     marginLeft: 62,
     marginRight: 4,
+  },
+  cancelBtn: {
+    backgroundColor: "rgba(255,107,138,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,107,138,0.25)",
+    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginTop: 4,
+  },
+  cancelText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: Colors.negative,
+    letterSpacing: 0.3,
+  },
+  disclaimer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    paddingTop: 12,
+    paddingHorizontal: 4,
+  },
+  disclaimerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textMuted,
+    flex: 1,
+    lineHeight: 14,
   },
 });

@@ -1,0 +1,116 @@
+"I am working on a fintech app called CardFlow. Do not break any existing functionality. Make the following targeted improvements across the app:
+
+## 1. LOGIN SCREEN REDESIGN
+The current login screen looks too basic. Redesign it to feel premium while keeping the dark purple theme. Requirements:
+- Add a glowing animated CardFlow logo or monogram at the top center (CF in a circle with a subtle pulse glow)
+- Use a larger, more elegant font for "CardFlow" — weight 700, slightly spaced out letters
+- Subtitle: "Your finances, beautifully organised" in a lighter muted purple/gray
+- Add a very subtle animated gradient background (slow-shifting deep navy to dark purple)
+- Input fields should have a frosted glass effect with a soft purple border glow on focus
+- The Sign In button should have a gradient (blue to purple) with a soft shadow glow
+- BETA MODE badge should be more subtle — small, top right corner, semi-transparent
+- Add a thin decorative line separator between the logo section and the form
+- Keep credentials: username: luispol / password: 12345 (beta only)
+
+## 2. GLOBAL UI — FROSTED GLASS SECTION SEPARATORS
+Across the entire app, every section card/container that currently blends into the background should instead use a frosted glass effect:
+- background: rgba(255, 255, 255, 0.05)
+- backdrop-filter: blur(16px)
+- border: 1px solid rgba(255, 255, 255, 0.08)
+- border-radius: 16px
+- box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3)
+Apply this to: stat summary bars, tab containers, card detail sections, payment breakdown boxes, subscription lists, and settings rows. Do NOT make it too opaque — keep it subtle and elegant.
+
+## 3. CARD LIST — MERCHANT LOGOS & EMOJI FALLBACKS
+In the individual card transaction view, merchant icons currently show as letter abbreviations. Fix this:
+- First attempt to match merchant name to a known brand favicon using: https://logo.clearbit.com/{domain}.com
+- For common merchants use these exact mappings:
+Netflix → netflix.com, Amazon → amazon.com, Spotify → spotify.com, Apple → apple.com, YouTube → youtube.com, Starbucks → starbucks.com, Walmart → walmart.com, Uber → uber.com, DoorDash → doordash.com, GitHub → github.com, Xbox → xbox.com
+- If logo fetch fails, fall back to a category emoji:
+Entertainment → 🎬, Food & Drink → ☕, Groceries → 🛒, Transport → 🚗, Shopping → 🛍️, Income → 💰, Gaming → 🎮, Developer → 💻, Healthcare → 🏥, Travel → ✈️, Other → 💳
+- Logo images should be displayed in a 36x36 circle with subtle background, never as plain letters
+
+## 4. INDIVIDUAL CARD VIEW — FULL DETAIL ROLODEX
+When a user taps a card from the Card List, the individual card detail screen should show:
+Tab 1 — Rewards & Benefits:
+- If card has cash back: show cash back percentage rate AND total cash back earned in dollars
+- If card has points: show points rate per dollar AND total points accumulated
+- If card has both: show both sections
+- Display a "Rewards Summary" banner with a progress bar showing how close they are to a reward threshold
+Tab 2 — Billing Dates:
+- Statement closing date
+- Payment due date
+- Minimum payment due amount
+- Show a color-coded urgency indicator: green (7+ days away), yellow (3-6 days), red (1-2 days), pulsing red (overdue)
+Tab 3 — Subscriptions:
+- List all recurring charges detected on this card
+- Show: merchant logo/emoji, subscription name, amount, billing frequency, next charge date
+- Each subscription row has a "Cancel" button — tapping it does NOT cancel in-app but instead opens the official cancellation URL for that service in the browser:
+Netflix → https://www.netflix.com/cancelplan
+Spotify → https://www.spotify.com/account/subscription/cancel
+Amazon Prime → https://www.amazon.com/mc/optOutEligibility
+YouTube Premium → https://myaccount.google.com/payments-and-subscriptions
+Xbox Game Pass → https://account.microsoft.com/services
+GitHub Pro → https://github.com/settings/billing
+For unknown subscriptions: open https://www.google.com/search?q=cancel+{merchant+name}+subscription
+- Add a disclaimer below the list: "CardFlow does not cancel subscriptions on your behalf. You will be redirected to the provider's official cancellation page."
+Tab 4 — Transactions:
+- Keep existing spending by category donut chart
+- Fix any text overflow on transaction rows (merchant names getting cut off with "rending", "hopping" etc.)
+- Pending vs Posted toggle should be visually distinct
+- Each transaction row: logo/emoji + merchant name (full, no truncation) + category + date + amount
+
+## 5. SETTINGS TAB — LINKED BANK ACCOUNTS (PLAID FLOW)
+In the Options/Settings tab, update the Linked Bank Accounts section with this logic:
+IF existing bank accounts are linked:
+- Display each linked bank with its name, account type, and last 4 digits (as currently shown)
+- Below the list, show a secondary button: "＋ Add Another Bank Account" (smaller, outlined style, not filled)
+IF no bank accounts are linked yet:
+- Show only a single prominent button: "🔗 Link Your Bank Account"
+- No other bank UI elements visible
+BOTH cases — when the link/add button is tapped:
+- Launch the Plaid Link SDK flow
+- Use PLAID_CLIENT_ID and PLAID_SANDBOX_SECRET from environment variables
+- Run in sandbox mode for now
+- On successful link: store only the Plaid access_token and item_id server-side, never raw credentials
+- After bank is linked: automatically fetch and display all credit and debit cards/accounts from that institution
+- Show a success toast: "✅ Bank linked successfully"
+## 5b. SETTINGS TAB — LINKED CARDS (PLAID CARD LINKING)
+In the Linked Cards row in settings:
+- Show count of currently linked cards
+- Tapping it opens a full screen showing all linked cards grouped by bank
+- Each card shows: card network logo (Visa/Mastercard/Amex), last 4 digits, card type
+- "＋ Add Card" button at the bottom triggers Plaid Link for adding additional accounts
+- Cards added here appear in the Card List rolodex automatically
+
+## 6. PAY TAB — STRIPE PAYMENT PROCESSING
+Integrate Stripe to handle real payment processing for the Pay tab:
+For "Pay All" and "Schedule Payment" flows:
+- Use STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY from environment variables
+- When user confirms payment, create a Stripe PaymentIntent server-side
+- The bank account selected (from Plaid linked accounts) is used as the payment source via ACH
+- Process: Plaid provides bank account token → convert to Stripe bank account token → initiate ACH debit
+- Never store raw bank account numbers — only Stripe and Plaid tokens
+- Platform fee of 0.5% should be calculated and added as a Stripe application fee
+- ACH transfer fee of $0.25 should be added to the total
+- On success: generate a confirmation code in format CF-XXXX-XXXX-XXXX and show the success screen
+- On failure: show a clear error message with a retry option
+For Scheduled Payments:
+- Store the scheduled payment details in the database with status "pending"
+- On the scheduled date, trigger the Stripe PaymentIntent
+- Show scheduled payments in the Pay tab with their status (Pending/Posted)
+
+## 7. TEXT & LAYOUT FIXES
+- Fix all truncated text in transaction rows (words like "rending", "hopping", "up" appearing as ghost text behind items — these appear to be overflow/z-index issues)
+- Ensure all dollar amounts are right-aligned consistently
+- Section header labels (ACCOUNT, LINKED BANK ACCOUNTS, SECURITY) should be more visible — increase letter spacing and use a slightly brighter muted color
+- On the Payment Confirmation screen, the title "Paymen" is cut off — fix the header to show full text "Payment Confirmation"
+- On the Choose Bank Account screen, "Choose [cut off] unt" should read "Choose Bank Account" fully
+- Total balance on dashboard "$59,684.2" is missing the last digit — ensure all currency amounts show exactly 2 decimal places ($59,684.20)
+
+## 8. CRYPTO PAYMENT SECTION — KEEP BUT LABEL
+The Crypto Payment Preview screen exists — keep it but add a banner at the top:
+"⚠️ Crypto payments coming soon — not available in beta"
+Disable the Confirm Crypto Pay All button and gray it out during beta.
+
+All API keys are stored in Replit Secrets as: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY, PLAID_CLIENT_ID, PLAID_SANDBOX_SECRET. Reference them only as environment variables. Never hardcode credentials."

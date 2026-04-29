@@ -2236,6 +2236,15 @@ function CryptoPayAllPreviewModal({ visible, onClose, onConfirm, totalUsd }: Cry
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Coming soon banner */}
+            <View style={prev.comingSoonBanner}>
+              <Text style={{ fontSize: 16 }}>⚠️</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={prev.comingSoonTitle}>Crypto payments coming soon</Text>
+                <Text style={prev.comingSoonSub}>Not available in beta — preview only</Text>
+              </View>
+            </View>
+
             {/* Amount hero */}
             <View style={prev.amtHero}>
               <Text style={prev.amtLabel}>Total Crypto Portfolio Value</Text>
@@ -2293,19 +2302,16 @@ function CryptoPayAllPreviewModal({ visible, onClose, onConfirm, totalUsd }: Cry
               </Text>
             </View>
 
-            <Pressable
-              onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onConfirm(); onClose(); }}
-              style={({ pressed }) => [prev.confirmBtn, pressed && { opacity: 0.85 }]}
-            >
+            <View style={[prev.confirmBtn, { opacity: 0.4 }]}>
               <LinearGradient
-                colors={["#7C3AED", "#9945FF"]}
+                colors={["#555", "#666"]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={prev.confirmBtnGrad}
               >
                 <Text style={{ fontSize: 16, marginRight: 4 }}>₿</Text>
                 <Text style={prev.confirmBtnText}>Confirm Crypto Pay All</Text>
               </LinearGradient>
-            </Pressable>
+            </View>
             <Pressable onPress={onClose} style={({ pressed }) => [prev.cancelBtn, pressed && { opacity: 0.7 }]}>
               <Text style={prev.cancelBtnText}>Cancel</Text>
             </Pressable>
@@ -2317,6 +2323,27 @@ function CryptoPayAllPreviewModal({ visible, onClose, onConfirm, totalUsd }: Cry
 }
 
 const prev = StyleSheet.create({
+  comingSoonBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(245,158,11,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.3)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  comingSoonTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#F59E0B",
+  },
+  comingSoonSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(245,158,11,0.7)",
+  },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: "#0E0828",
