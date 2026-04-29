@@ -14,8 +14,51 @@
 - `constants/colors.ts` — Design tokens (primary, positive, negative, textPrimary, textMuted, divider, etc.)
 - `assets/images/bg-damask.png` — Luxury damask texture background (opacity 0.09–0.13)
 
-## Backend Credit API (artifacts/api-server/)
-- `src/routes/credit.ts` — Credit intelligence REST API: GET /api/credit/profile, /score, /health, /debt, /utilization, /payment-history, /factors, /recommendations. All return mock data matching the CreditProfile component's data shape.
+## Backend API (artifacts/api-server/)
+- `src/routes/credit.ts` — Credit intelligence REST API (mock data): GET /api/credit/{profile,score,health,debt,utilization,payment-history,factors,recommendations}
+- `src/routes/auth.ts` — Beta auth: POST /api/auth/login, GET /api/auth/me, POST /api/auth/logout
+- `src/routes/plaid.ts` — Plaid: POST /api/plaid/link-token, POST /api/plaid/exchange, GET /api/plaid/accounts, POST /api/plaid/processor-token
+- `src/routes/stripe.ts` — Stripe: POST /api/stripe/charge, POST /api/stripe/payment-intent
+- `src/middleware/auth.ts` — JWT Bearer token middleware (`requireAuth`)
+- `src/lib/store.ts` — In-memory Plaid access token + account store (beta only — resets on restart)
+- `src/lib/plaid-client.ts` — Plaid Node.js SDK client factory
+- `src/lib/stripe-client.ts` — Stripe Node.js SDK client factory
+
+## Auth / Plaid / Stripe Integration
+- Auth: JWT-based (jsonwebtoken). Single beta user hardcoded in `routes/auth.ts`. Frontend stores JWT in AsyncStorage via `context/AuthContext.tsx`.
+- Plaid: Sandbox mode. Frontend `PlaidLinkedCards` component fetches a link token, opens Plaid Link (web-only via `react-plaid-link`), exchanges the public token server-side. Linked accounts stored in `FinanceContext.plaidAccounts`.
+- Stripe: ACH payments via Plaid processor tokens. No raw card/bank numbers ever stored.
+- Beta test credentials: email `beta@finapp.com`, password `BetaTest2025!` (changeable via env vars BETA_USER_EMAIL / BETA_USER_PASSWORD)
+- Required env vars: JWT_SECRET, PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV, STRIPE_SECRET_KEY, EXPO_PUBLIC_API_BASE_URL — see `.env.example`
+
+## Sandbox → Production Migration Guide
+
+### 1. Replace the beta user with real auth
+- Remove the hardcoded `BETA_USER` in `src/routes/auth.ts`
+- Replace with a real user database (Postgres via `@workspace/db` + Drizzle ORM, or Clerk/Auth0)
+- Add user registration, password hashing (bcrypt/argon2), and proper session/refresh token handling
+
+### 2. Plaid: switch from sandbox to production
+- In Plaid dashboard: apply for development/production access
+- Change `PLAID_ENV=sandbox` → `PLAID_ENV=development` or `PLAID_ENV=production`
+- Update `PLAID_SECRET` to the production secret from your Plaid dashboard
+- Add webhook handling (`POST /api/plaid/webhook`) for real-time transaction updates
+- Persist access tokens to the database instead of the in-memory store (`src/lib/store.ts`)
+
+### 3. Stripe: switch to live keys
+- Change `STRIPE_SECRET_KEY` from `sk_test_...` to `sk_live_...`
+- Change `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` from `pk_test_...` to `pk_live_...`
+- Enable Stripe webhooks for payment confirmation events
+
+### 4. Persist Plaid access tokens to database
+- The current `src/lib/store.ts` is in-memory only — data is lost on server restart
+- Add a `plaid_items` table via Drizzle ORM in `lib/db/src/schema/`
+- Update `addPlaidItem` / `getPlaidItems` to read/write the database
+
+### 5. Plaid on native mobile (iOS/Android)
+- The current `react-plaid-link` SDK is browser-only
+- For native builds, install `react-native-plaid-link-sdk` and create a platform-specific component (`PlaidLinkedCards.native.tsx`)
+- Configure OAuth redirect URI in the Plaid dashboard
 
 ## Design System
 - Glass cards: `backgroundColor: "rgba(28,14,70,0.88)"`, `borderColor: "rgba(255,255,255,0.11)"`, inline `backdropFilter/boxShadow`

@@ -15,8 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useFinance } from "@/context/FinanceContext";
-import type { BankAccount } from "@/context/FinanceContext";
+import { useFinance, type BankAccount, type PlaidLinkedAccount } from "@/context/FinanceContext";
 
 const BANK_ICONS: Record<string, string> = {
   "Chase Bank": "🏦",
@@ -115,8 +114,48 @@ function AddBankModal({
   );
 }
 
+function PlaidAccountRow({
+  account,
+  isSelected,
+  onSelect,
+}: {
+  account: PlaidLinkedAccount;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const label = account.subtype
+    ? account.subtype.charAt(0).toUpperCase() + account.subtype.slice(1)
+    : account.type;
+  const balance = account.balanceCurrent ?? account.balanceAvailable;
+  return (
+    <Pressable
+      onPress={onSelect}
+      style={[styles.bankCard, isSelected && styles.bankCardSelected]}
+    >
+      <View style={[styles.bankIcon, isSelected && styles.bankIconSelected]}>
+        <Feather name="credit-card" size={20} color={isSelected ? "#fff" : Colors.primary} />
+      </View>
+      <View style={styles.bankInfo}>
+        <Text style={styles.bankName}>{account.institutionName}</Text>
+        <Text style={styles.bankSub}>
+          {label}
+          {account.mask ? `  ····${account.mask}` : ""}
+          {balance != null
+            ? `  ·  ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balance)}`
+            : ""}
+        </Text>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
+          {isSelected && <View style={styles.radioInner} />}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function BankSelectScreen() {
-  const { bankAccounts, pendingPayment, cards } = useFinance();
+  const { bankAccounts, plaidAccounts, pendingPayment, cards } = useFinance();
   const insets = useSafeAreaInsets();
   const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
   const [addBankVisible, setAddBankVisible] = useState(false);
@@ -179,6 +218,30 @@ export default function BankSelectScreen() {
               <Text style={styles.summaryTotalValue}>{formatCurrency(totalPayment)}</Text>
             </View>
           </View>
+        )}
+
+        {plaidAccounts.length > 0 && (
+          <>
+            <View style={styles.plaidBadgeRow}>
+              <Feather name="shield" size={12} color={Colors.positive} />
+              <Text style={styles.plaidBadgeText}>Plaid-linked Accounts</Text>
+            </View>
+            {plaidAccounts.map((acct) => {
+              const selId = `plaid-${acct.accountId}`;
+              return (
+                <PlaidAccountRow
+                  key={acct.accountId}
+                  account={acct}
+                  isSelected={selectedBankId === selId}
+                  onSelect={() => {
+                    Haptics.selectionAsync();
+                    setSelectedBankId(selId);
+                  }}
+                />
+              );
+            })}
+            <View style={styles.divider} />
+          </>
         )}
 
         <Text style={styles.sectionLabel}>Linked Bank Accounts</Text>
@@ -338,6 +401,24 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 12,
+  },
+  plaidBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  plaidBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.positive,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginVertical: 14,
   },
   bankCard: {
     flexDirection: "row",

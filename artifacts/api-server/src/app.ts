@@ -25,7 +25,17 @@ app.use(
     },
   }),
 );
-app.use(cors());
+
+// Allow any origin with credentials — tighten this for production
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

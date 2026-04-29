@@ -55,6 +55,19 @@ export type BankAccount = {
   nickname?: string;
 };
 
+export type PlaidLinkedAccount = {
+  accountId: string;
+  name: string;
+  officialName: string | null;
+  mask: string | null;
+  type: string;
+  subtype: string | null;
+  balanceCurrent: number | null;
+  balanceAvailable: number | null;
+  balanceLimit: number | null;
+  institutionName: string;
+};
+
 export type PendingPayment = {
   cardIds: string[];
   amounts: Record<string, number>;
@@ -67,11 +80,13 @@ type FinanceContextType = {
   transactions: Transaction[];
   scheduledPayments: ScheduledPayment[];
   bankAccounts: BankAccount[];
+  plaidAccounts: PlaidLinkedAccount[];
   pendingPayment: PendingPayment | null;
   totalBalance: number;
   addScheduledPayment: (payment: Omit<ScheduledPayment, "id" | "status">) => void;
   cancelScheduledPayment: (id: string) => void;
   addBankAccount: (bank: Omit<BankAccount, "id">) => void;
+  addPlaidAccounts: (accounts: PlaidLinkedAccount[]) => void;
   setPendingPayment: (p: PendingPayment | null) => void;
 };
 
@@ -367,6 +382,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [transactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [scheduledPayments, setScheduledPayments] = useState<ScheduledPayment[]>(INITIAL_SCHEDULED);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANKS);
+  const [plaidAccounts, setPlaidAccounts] = useState<PlaidLinkedAccount[]>([]);
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
 
   const totalBalance = cards.reduce((sum, c) => sum + c.balance, 0);
@@ -395,6 +411,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const addPlaidAccounts = useCallback((accounts: PlaidLinkedAccount[]) => {
+    setPlaidAccounts((prev) => {
+      const existingIds = new Set(prev.map((a) => a.accountId));
+      const newOnes = accounts.filter((a) => !existingIds.has(a.accountId));
+      return [...prev, ...newOnes];
+    });
+  }, []);
+
   return (
     <FinanceContext.Provider
       value={{
@@ -402,11 +426,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         transactions,
         scheduledPayments,
         bankAccounts,
+        plaidAccounts,
         pendingPayment,
         totalBalance,
         addScheduledPayment,
         cancelScheduledPayment,
         addBankAccount,
+        addPlaidAccounts,
         setPendingPayment,
       }}
     >

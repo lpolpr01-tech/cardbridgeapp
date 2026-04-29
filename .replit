@@ -24,3 +24,13 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "9fe982c4d3df19f831b12a209b230a28dd1cd5e20d5c8989c1d217ecbc21416fa0ed79165aa7f894402379973b4409b8fb5590d89e4c2f4b27fa9ef73242b267"
+PLAID_ENV = "sandbox"
+BETA_USER_EMAIL = "beta@finapp.com"
+BETA_USER_PASSWORD = "BetaTest2025!"
+EXPO_PUBLIC_BETA_EMAIL = "beta@finapp.com"
+EXPO_PUBLIC_BETA_PASSWORD = "BetaTest2025!"
