@@ -24,41 +24,55 @@ import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
 // ─── Merchant logo / emoji helpers ────────────────────────────────────────────
 
 const MERCHANT_DOMAINS: Record<string, string> = {
-  Netflix: "netflix.com",
-  Amazon: "amazon.com",
-  Spotify: "spotify.com",
-  Apple: "apple.com",
-  YouTube: "youtube.com",
-  Starbucks: "starbucks.com",
-  Walmart: "walmart.com",
-  Uber: "uber.com",
-  DoorDash: "doordash.com",
-  GitHub: "github.com",
-  Xbox: "xbox.com",
+  "Delta Airlines":   "delta.com",
+  "United Airlines":  "united.com",
+  "Hotel Marriott":   "marriott.com",
+  "Hilton Hotels":    "hilton.com",
+  "Hilton":           "hilton.com",
+  "Marriott":         "marriott.com",
+  Uber:               "uber.com",
+  Lyft:               "lyft.com",
+  Netflix:            "netflix.com",
+  Spotify:            "spotify.com",
+  Amazon:             "amazon.com",
+  Starbucks:          "starbucks.com",
+  "Whole Foods":      "wholefoodsmarket.com",
+  Apple:              "apple.com",
+  "Apple Store":      "apple.com",
+  Google:             "google.com",
+  YouTube:            "youtube.com",
+  Xbox:               "xbox.com",
+  GitHub:             "github.com",
+  DoorDash:           "doordash.com",
+  Walmart:            "walmart.com",
+  Target:             "target.com",
+  "Trader Joe's":     "traderjoes.com",
+  "Gym Membership":   null as any,
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  Entertainment: "🎬",
+  Entertainment:  "🎬",
   "Food & Drink": "☕",
-  Food: "☕",
-  Dining: "☕",
-  Groceries: "🛒",
-  Transport: "🚗",
-  Shopping: "🛍️",
-  Income: "💰",
-  Gaming: "🎮",
-  Developer: "💻",
-  Healthcare: "🏥",
-  Health: "🏥",
-  Travel: "✈️",
-  Music: "🎵",
-  Video: "📺",
-  Storage: "☁️",
-  Creative: "🎨",
-  News: "📰",
-  Education: "🦉",
-  Security: "🔑",
-  Other: "💳",
+  Food:           "☕",
+  Dining:         "☕",
+  Groceries:      "🛒",
+  Transport:      "🚗",
+  Shopping:       "🛍️",
+  Income:         "💰",
+  Gaming:         "🎮",
+  Developer:      "💻",
+  Healthcare:     "🏥",
+  Health:         "🏥",
+  Electronics:    "📱",
+  Travel:         "✈️",
+  Music:          "🎵",
+  Video:          "📺",
+  Storage:        "☁️",
+  Creative:       "🎨",
+  News:           "📰",
+  Education:      "🦉",
+  Security:       "🔑",
+  Other:          "💳",
 };
 
 const CANCEL_URLS: Record<string, string> = {
@@ -75,27 +89,34 @@ function getCancelUrl(name: string): string {
   return `https://www.google.com/search?q=cancel+${encodeURIComponent(name)}+subscription`;
 }
 
-function MerchantLogo({ title, category, icon }: { title: string; category: string; icon: string }) {
+function MerchantLogo({ title, category }: { title: string; category: string }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const domain = Object.entries(MERCHANT_DOMAINS).find(
-    ([key]) => title.toLowerCase().includes(key.toLowerCase())
-  )?.[1];
-  const emoji = icon || CATEGORY_EMOJI[category] || "💳";
+
+  const domain = (() => {
+    for (const [key, val] of Object.entries(MERCHANT_DOMAINS)) {
+      if (val && title.toLowerCase().includes(key.toLowerCase())) return val;
+    }
+    return null;
+  })();
+
+  const emoji = CATEGORY_EMOJI[category] ?? "💳";
 
   if (domain && !imgFailed) {
     return (
-      <View style={txp.txIcon}>
+      <View style={txp.txIconCircle}>
         <Image
           source={{ uri: `https://logo.clearbit.com/${domain}` }}
-          style={{ width: 22, height: 22, borderRadius: 4 }}
+          style={txp.txLogoImg}
           onError={() => setImgFailed(true)}
+          resizeMode="contain"
         />
       </View>
     );
   }
+
   return (
-    <View style={txp.txIcon}>
-      <Text style={{ fontSize: 17 }}>{emoji}</Text>
+    <View style={txp.txIconCircle}>
+      <Text style={txp.txEmoji}>{emoji}</Text>
     </View>
   );
 }
@@ -598,7 +619,7 @@ function TransactionsPanel({ cardId }: { cardId: string }) {
       ) : (
         shown.map((t, i) => (
           <View key={t.id} style={[txp.txRow, i < shown.length - 1 && txp.txBorder]}>
-            <MerchantLogo title={t.title} category={t.category} icon={t.icon} />
+            <MerchantLogo title={t.title} category={t.category} />
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text style={txp.txTitle} numberOfLines={1} ellipsizeMode="tail">{t.title}</Text>
               <Text style={txp.txCat} numberOfLines={1}>{t.category} · {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</Text>
@@ -633,7 +654,10 @@ const txp = StyleSheet.create({
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textMuted },
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
   txBorder: { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)" },
-  txIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  txIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center", justifyContent: "center" },
+  txIconCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 },
+  txLogoImg: { width: 38, height: 38, borderRadius: 19 },
+  txEmoji: { fontSize: 19 },
   txTitle: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textPrimary },
   txCat: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted },
   txAmt: { fontFamily: "Inter_600SemiBold", fontSize: 13 },

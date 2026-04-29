@@ -1,0 +1,73 @@
+"Fix these two specific issues in CardFlow without touching anything else:
+
+## FIX 1 — TRANSACTION ICONS: RAW TEXT SHOWING INSTEAD OF ICONS
+In the transactions list on the individual card detail screen, icon component names are rendering as visible text strings on the left side of each row (words like "navigation", "home", "refresh", "map-pin", "coffee", "cw"). This means the icon library is not rendering correctly and is falling back to text.
+Fix this completely:
+- Remove all icon component references from transaction rows entirely
+- Replace with this exact priority logic for every transaction:
+Step 1 — Try Clearbit logo:
+Merchant name → domain mapping:
+Delta Airlines → delta.com
+United Airlines → united.com
+Hotel Marriott → marriott.com
+Hilton Hotels → hilton.com
+Uber → uber.com
+Lyft → lyft.com
+Netflix → netflix.com
+Spotify → spotify.com
+Amazon → amazon.com
+Starbucks → starbucks.com
+Whole Foods → wholefoodsmarket.com
+Apple → apple.com
+Google → google.com
+YouTube → youtube.com
+Xbox → xbox.com
+GitHub → github.com
+DoorDash → doordash.com
+Walmart → walmart.com
+Target → target.com
+Fine Dining → use category emoji fallback
+Travel Refund → use category emoji fallback
+Miles Refund → use category emoji fallback
+Clearbit URL format: https://logo.clearbit.com/{domain}
+Display as a 38x38 circular image with a dark semi-transparent background circle behind it
+Step 2 — If Clearbit fetch fails or merchant is unknown, use this category emoji mapping displayed in a 38x38 circle:
+Travel → ✈️
+Food & Drink → ☕
+Groceries → 🛒
+Transport → 🚗
+Shopping → 🛍️
+Income → 💰
+Gaming → 🎮
+Developer → 💻
+Healthcare → 🏥
+Entertainment → 🎬
+Utilities → ⚡
+Other → 💳
+Step 3 — If no category match, default to 💳 in a circle
+IMPORTANT: No raw text strings, no icon library component names, no letters should ever appear in the merchant icon column. Only images or emojis inside a circle container.
+
+## FIX 2 — SETTINGS: BANK ACCOUNTS PRIVACY + REMOVE MANUAL LINKING FORM
+In the Options/Settings tab, make these two changes to the Linked Bank Accounts section:
+### Part A — Add Privacy Toggle Row
+The existing linked bank accounts (Chase Bank, Bank of America) and the add button should be hidden by default behind a collapsible row.
+Replace the current always-visible bank list with this structure:
+Show a single tappable row that reads:
+🏦 Bank Accounts → (with a chevron › on the right and a count badge showing how many banks are linked, e.g. "2 linked")
+When tapped, it expands to reveal:
+- Each linked bank with its Clearbit logo, name, account type, last 4 digits, and green Connected dot
+- At the bottom of the expanded list: an "＋ Add Another Bank Account" outlined button
+When tapped again, it collapses back — bank details are hidden from the main settings view
+### Part B — Remove Manual Form, Replace With Plaid
+The current "Link Bank Account" modal shows a manual form asking for: Bank Name, Account Type, Last 4 Digits, Routing Number, Nickname.
+Delete this entire manual form modal completely.
+When the user taps "＋ Add Another Bank Account" (or the initial "Link Bank Account" button if no banks are linked yet), instead of showing the manual form:
+- Launch the Plaid Link SDK directly
+- Use PLAID_CLIENT_ID and PLAID_SANDBOX_SECRET from environment variables
+- Run in sandbox mode
+- On successful Plaid link: store only the access_token and item_id server-side
+- Automatically fetch the linked accounts from Plaid and add them to the bank list
+- Show a success toast: ✅ Bank linked successfully
+- The newly linked bank appears immediately in the expanded Bank Accounts section
+On Plaid link cancelled or failed: show a dismissible error message "Bank linking was cancelled. Please try again." — do not show the manual form as a fallback.
+All Plaid credentials come from Replit Secrets only. Never expose them to the frontend."

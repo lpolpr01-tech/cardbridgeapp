@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useRef, useState } from "react";
 import { SupportSection } from "@/components/SupportSection";
+import { PlaidAddBankButton } from "@/components/PlaidAddBankButton";
 import {
   Alert,
   Animated,
@@ -620,76 +621,6 @@ const pm = StyleSheet.create({
   itemSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
 });
 
-// ─── Add Bank Modal ───────────────────────────────────────────────────────────
-
-function AddBankModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { addBankAccount } = useFinance();
-  const insets = useSafeAreaInsets();
-  const [bankName, setBankName] = useState("");
-  const [accountType, setAccountType] = useState<"checking" | "savings">("checking");
-  const [lastFour, setLastFour] = useState("");
-  const [routing, setRouting] = useState("");
-  const [nickname, setNickname] = useState("");
-
-  const handleAdd = () => {
-    if (!bankName.trim() || lastFour.length < 4) {
-      Alert.alert("Required Fields", "Please enter the bank name and last 4 digits.");
-      return;
-    }
-    addBankAccount({ bankName: bankName.trim(), accountType, lastFour: lastFour.slice(-4), nickname: nickname.trim() || undefined });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onClose();
-    setBankName(""); setLastFour(""); setNickname(""); setRouting("");
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={bankModal.overlay}>
-        <View style={[bankModal.sheet, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={bankModal.handle} />
-          <View style={bankModal.header}>
-            <Text style={bankModal.title}>Link Bank Account</Text>
-            <Pressable onPress={onClose} style={bankModal.closeBtn}>
-              <Feather name="x" size={20} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={bankModal.achBadge}>
-              <Feather name="shield" size={13} color={Colors.positive} />
-              <Text style={bankModal.achText}>ACH Secure Transfer · 256-bit Encryption</Text>
-            </View>
-            <Text style={bankModal.fieldLabel}>Bank Name</Text>
-            <TextInput style={bankModal.input} value={bankName} onChangeText={setBankName} placeholder="e.g. Chase Bank" placeholderTextColor={Colors.textMuted} />
-            <Text style={bankModal.fieldLabel}>Account Type</Text>
-            <View style={bankModal.typeRow}>
-              {(["checking", "savings"] as const).map((t) => (
-                <Pressable key={t} onPress={() => setAccountType(t)} style={[bankModal.typeBtn, accountType === t && bankModal.typeBtnActive]}>
-                  <Text style={[bankModal.typeText, accountType === t && bankModal.typeTextActive]}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={bankModal.fieldLabel}>Last 4 Account Digits</Text>
-            <TextInput style={bankModal.input} value={lastFour} onChangeText={setLastFour} placeholder="1234" placeholderTextColor={Colors.textMuted} keyboardType="number-pad" maxLength={4} />
-            <Text style={bankModal.fieldLabel}>Routing Number</Text>
-            <TextInput style={bankModal.input} value={routing} onChangeText={setRouting} placeholder="123456789" placeholderTextColor={Colors.textMuted} keyboardType="number-pad" maxLength={9} />
-            <Text style={bankModal.fieldLabel}>Nickname (optional)</Text>
-            <TextInput style={bankModal.input} value={nickname} onChangeText={setNickname} placeholder="e.g. Primary Checking" placeholderTextColor={Colors.textMuted} />
-            <Text style={bankModal.disclaimer}>
-              By linking your account you authorize ACH debit transactions. Banking information is encrypted and never stored on our servers.
-            </Text>
-            <Pressable onPress={handleAdd} style={({ pressed }) => [bankModal.saveBtn, pressed && { opacity: 0.8 }]}>
-              <Feather name="link" size={16} color="#fff" />
-              <Text style={bankModal.saveBtnText}>Link Account</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Personal Info Modal ──────────────────────────────────────────────────────
 
 type PersonalInfo = {
@@ -1081,7 +1012,7 @@ export default function OptionsScreen() {
   const insets = useSafeAreaInsets();
   const { cards, transactions, bankAccounts } = useFinance();
   const [biometricEnabled, setBiometricEnabled] = React.useState(false);
-  const [addBankVisible, setAddBankVisible] = useState(false);
+  const [banksExpanded, setBanksExpanded] = useState(false);
   const [kycVisible, setKycVisible] = useState(false);
   const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
 
@@ -1174,57 +1105,69 @@ export default function OptionsScreen() {
         </View>
 
         <SectionLabel text="Linked Bank Accounts" />
-        {bankAccounts.length === 0 ? (
-          <View style={[styles.settingsGroup, GLASS_INLINE, bankS.emptyWrap]}>
-            <Feather name="link" size={28} color={Colors.primary} style={{ marginBottom: 8 }} />
-            <Text style={bankS.emptyTitle}>No bank accounts linked</Text>
-            <Text style={bankS.emptySubtitle}>Connect a bank to enable ACH payments and direct transfers.</Text>
-            <Pressable
-              onPress={() => { Haptics.selectionAsync(); setAddBankVisible(true); }}
-              style={({ pressed }) => [bankS.linkBtn, pressed && { opacity: 0.85 }]}
-            >
-              <Feather name="plus" size={15} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={bankS.linkBtnText}>Link Bank Account</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={[styles.settingsGroup, GLASS_INLINE]}>
-            {bankAccounts.map((bank, idx) => (
-              <React.Fragment key={bank.id}>
-                {idx > 0 && <View style={styles.rowDivider} />}
-                <View style={styles.settingRow}>
-                  <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.1)" }]}>
-                    <Feather name="database" size={18} color={Colors.positive} />
-                  </View>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingLabel}>{bank.bankName}</Text>
-                    <Text style={styles.settingSubtitle}>
-                      {bank.accountType.charAt(0).toUpperCase() + bank.accountType.slice(1)} ···{bank.lastFour}
-                      {bank.nickname ? `  ·  ${bank.nickname}` : ""}
-                    </Text>
-                  </View>
-                  <View style={styles.achBadge}>
-                    <Text style={styles.achBadgeText}>ACH</Text>
-                  </View>
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
+          {/* Collapsible header row */}
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); setBanksExpanded((e) => !e); }}
+            style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
+          >
+            <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.1)" }]}>
+              <Text style={{ fontSize: 17 }}>🏦</Text>
+            </View>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Bank Accounts</Text>
+              <Text style={styles.settingSubtitle}>
+                {bankAccounts.length === 0 ? "No accounts linked" : `${bankAccounts.length} linked`}
+              </Text>
+            </View>
+            {bankAccounts.length > 0 && (
+              <View style={bankS.countBadge}>
+                <Text style={bankS.countBadgeText}>{bankAccounts.length} linked</Text>
+              </View>
+            )}
+            <Feather
+              name={banksExpanded ? "chevron-up" : "chevron-right"}
+              size={16}
+              color={Colors.textMuted}
+            />
+          </Pressable>
+
+          {/* Expanded content */}
+          {banksExpanded && (
+            <>
+              {bankAccounts.length === 0 && (
+                <View style={bankS.emptyInline}>
+                  <Text style={bankS.emptyInlineText}>No bank accounts linked yet. Add one below.</Text>
                 </View>
-              </React.Fragment>
-            ))}
-            <View style={styles.rowDivider} />
-            <Pressable
-              onPress={() => { Haptics.selectionAsync(); setAddBankVisible(true); }}
-              style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
-            >
-              <View style={[styles.settingIcon, { backgroundColor: "rgba(108,158,255,0.1)" }]}>
-                <Feather name="plus-circle" size={18} color={Colors.primary} />
+              )}
+              {bankAccounts.map((bank, idx) => (
+                <React.Fragment key={bank.id}>
+                  <View style={styles.rowDivider} />
+                  <View style={styles.settingRow}>
+                    <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.08)" }]}>
+                      <Feather name="database" size={16} color={Colors.positive} />
+                    </View>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>{bank.bankName}</Text>
+                      <Text style={styles.settingSubtitle}>
+                        {bank.accountType.charAt(0).toUpperCase() + bank.accountType.slice(1)} ···{bank.lastFour}
+                        {bank.nickname ? `  ·  ${bank.nickname}` : ""}
+                      </Text>
+                    </View>
+                    <View style={bankS.connectedBadge}>
+                      <View style={bankS.connectedDot} />
+                      <Text style={bankS.connectedText}>Connected</Text>
+                    </View>
+                  </View>
+                </React.Fragment>
+              ))}
+              <View style={[styles.rowDivider, { marginTop: 8 }]} />
+              <View style={bankS.addBtnWrap}>
+                <PlaidAddBankButton />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, { color: Colors.primary }]}>Add Another Bank Account</Text>
-                <Text style={styles.settingSubtitle}>ACH payments · secure transfer</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color={Colors.textMuted} />
-            </Pressable>
-          </View>
-        )}
+            </>
+          )}
+        </View>
 
         <SectionLabel text="Security" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
@@ -1260,7 +1203,6 @@ export default function OptionsScreen() {
         <Text style={styles.version}>CardFlow v1.0.0</Text>
       </ScrollView>
 
-      <AddBankModal visible={addBankVisible} onClose={() => setAddBankVisible(false)} />
       <PersonalInfoModal
         visible={personalInfoVisible}
         info={personalInfo}
@@ -1290,40 +1232,18 @@ export default function OptionsScreen() {
 // ─── Bank empty-state styles ──────────────────────────────────────────────────
 
 const bankS = StyleSheet.create({
-  emptyWrap: {
-    alignItems: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    gap: 6,
+  countBadge: {
+    backgroundColor: "rgba(108,158,255,0.18)",
+    borderRadius: 10, borderWidth: 1, borderColor: "rgba(108,158,255,0.3)",
+    paddingHorizontal: 9, paddingVertical: 3, marginRight: 6,
   },
-  emptyTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.textPrimary,
-    textAlign: "center",
-  },
-  emptySubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: "center",
-    lineHeight: 17,
-    marginBottom: 8,
-  },
-  linkBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-    marginTop: 4,
-  },
-  linkBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: "#fff",
-  },
+  countBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.primary },
+  connectedBadge: { flexDirection: "row", alignItems: "center", gap: 5, marginRight: 4 },
+  connectedDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.positive },
+  connectedText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.positive },
+  emptyInline: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  emptyInlineText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted, textAlign: "center" },
+  addBtnWrap: { paddingHorizontal: 4, paddingBottom: 4, paddingTop: 4 },
 });
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -1407,50 +1327,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(74,222,170,0.25)",
   },
   achBadgeText: { fontFamily: "Inter_700Bold", fontSize: 10, color: Colors.positive, letterSpacing: 1 },
-});
-
-const bankModal = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 12, maxHeight: "90%",
-  },
-  handle: { width: 36, height: 4, backgroundColor: Colors.divider, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
-  title: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.textPrimary },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  achBadge: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(74,222,170,0.1)", borderRadius: 10, padding: 10,
-    borderWidth: 1, borderColor: "rgba(74,222,170,0.2)", marginBottom: 20,
-  },
-  achText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.positive },
-  fieldLabel: {
-    fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textMuted,
-    textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8, marginTop: 4,
-  },
-  input: {
-    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textPrimary,
-    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: Colors.divider, marginBottom: 12,
-  },
-  typeRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  typeBtn: {
-    flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: Colors.divider,
-  },
-  typeBtnActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
-  typeText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
-  typeTextActive: { color: "#fff" },
-  disclaimer: {
-    fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted,
-    lineHeight: 16, marginTop: 8, marginBottom: 16, textAlign: "center",
-  },
-  saveBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: Colors.primaryDark, borderRadius: 14, paddingVertical: 16, marginBottom: 8,
-  },
-  saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
 });
 
 const piModal = StyleSheet.create({
