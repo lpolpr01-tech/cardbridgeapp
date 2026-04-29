@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   Animated,
   Image,
@@ -24,6 +24,8 @@ import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
 import { CreditProfileSection } from "@/components/CreditProfile";
 import { PlaidLinkedCards } from "@/components/PlaidLinkedCards";
 import { SupportSection } from "@/components/SupportSection";
+import { BudgetingScreen } from "@/components/BudgetingScreen";
+import { apiUrl } from "@/constants/api";
 
 // ─── Subscriptions Row ────────────────────────────────────────────────────────
 
@@ -62,84 +64,145 @@ function SubscriptionsRow() {
 
 // ─── AI Agent Modal ───────────────────────────────────────────────────────────
 
-const AI_SUGGESTIONS = [
-  { icon: "trending-down", color: "#4ADEAA", text: "Your Cash Back Gold utilization is at 24% — well within the ideal range. Keep it up!" },
-  { icon: "alert-circle",  color: "#FBBF24", text: "Travel Elite is at 78% utilization. Paying $500 extra this month could boost your score by ~12 pts." },
-  { icon: "zap",           color: "#6C9EFF", text: "You have $313 in cash back ready to redeem. Optimal time to redeem before statement close on the 30th." },
-  { icon: "calendar",      color: "#FF6B9D", text: "3 payments due in the next 10 days totalling $1,250. Set up auto-pay to avoid late fees." },
+const STARTER_PROMPTS = [
+  { emoji: "💳", text: "Which card should I use for dining?" },
+  { emoji: "📊", text: "Analyze my spending this month" },
+  { emoji: "💰", text: "How do I maximize my cash back?" },
+  { emoji: "📅", text: "When is my next payment due?" },
+  { emoji: "🏦", text: "Explain APR vs interest rate" },
+  { emoji: "📈", text: "How do I improve my credit score?" },
 ];
+
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function AiAgentModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<{ from: "user" | "ai"; text: string }[]>([]);
+  const { cards } = useFinance();
+  const [input, setInput]     = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typing, setTyping]   = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
-  React.useEffect(() => {
-    if (!visible) { setInput(""); setMessages([]); }
+  useEffect(() => {
+    if (!visible) { setInput(""); setMessages([]); setTyping(false); }
   }, [visible]);
 
-  const send = () => {
-    if (!input.trim()) return;
-    const userMsg = input.trim();
-    setMessages((m) => [...m, { from: "user", text: userMsg }]);
+  const buildContext = useCallback(() => {
+    const totalBalance = cards.reduce((s, c) => s + c.balance, 0);
+    const totalLimit   = cards.reduce((s, c) => s + c.limit, 0);
+    const utilPct      = totalLimit > 0 ? ((totalBalance / totalLimit) * 100).toFixed(1) : "—";
+    const cashback     = cards.reduce((s, c) => s + (c.rewards?.cashbackTotal ?? 0), 0);
+    const points       = cards.reduce((s, c) => s + (c.rewards?.pointsTotal ?? 0), 0);
+    const subTotal     = SUBSCRIPTIONS.reduce((s, x) => s + x.amount, 0);
+    const cardList     = cards.map((c) => `${c.name} (balance $${c.balance}, limit $${c.limit}, util ${c.limit > 0 ? ((c.balance / c.limit) * 100).toFixed(0) : 0}%)`).join("; ");
+    return `User context: Cards: [${cardList}]. Total balance: $${totalBalance.toFixed(2)}. Total limit: $${totalLimit.toFixed(2)}. Overall utilization: ${utilPct}%. Monthly subscriptions: $${subTotal.toFixed(2)}/mo. Total cash back earned: $${cashback.toFixed(2)}. Rewards points: ${points.toLocaleString()} pts.`;
+  }, [cards]);
+
+  const send = useCallback(async (text?: string) => {
+    const msg = (text ?? input).trim();
+    if (!msg || typing) return;
     setInput("");
-    setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        { from: "ai", text: "Great question! Based on your current spending patterns, I'd recommend focusing on paying down the Travel Elite card first to optimize your credit utilization ratio. This could improve your score by approximately 15 points within 30 days." },
-      ]);
-    }, 900);
-  };
+    const newMsg: ChatMessage = { role: "user", content: msg };
+    const history = [...messages, newMsg];
+    setMessages(history);
+    setTyping(true);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+
+    try {
+      const res = await fetch(apiUrl("/api/ai-agent"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history, userContext: buildContext() }),
+      });
+      const data = await res.json();
+      setMessages((m) => [...m, { role: "assistant", content: data.reply ?? "Sorry, I couldn't get a response. Please try again." }]);
+    } catch {
+      setMessages((m) => [...m, { role: "assistant", content: "Connection error. Please check your network and try again." }]);
+    } finally {
+      setTyping(false);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [input, messages, typing, buildContext]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={aim.overlay}>
         <View style={[aim.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={aim.handle} />
+
+          {/* Header */}
           <View style={aim.header}>
-            <View style={aim.agentAvatar}>
-              <Feather name="cpu" size={20} color={Colors.primary} />
-            </View>
+            <LinearGradient colors={["#3B1F6A", "#1A3A6A"]} style={aim.agentAvatar}>
+              <Feather name="cpu" size={20} color="#C084FC" />
+              <View style={aim.avatarGlow} />
+            </LinearGradient>
             <View style={aim.headerInfo}>
               <Text style={aim.title}>CardFlow AI</Text>
               <View style={aim.onlineRow}>
                 <View style={aim.onlineDot} />
-                <Text style={aim.onlineText}>Credit Optimization Agent</Text>
+                <Text style={aim.onlineText}>Your personal finance assistant</Text>
               </View>
             </View>
+            <Pressable onPress={() => setMessages([])} style={aim.clearBtn}>
+              <Feather name="trash-2" size={15} color={Colors.textMuted} />
+            </Pressable>
             <Pressable onPress={onClose} style={aim.closeBtn}>
               <Feather name="x" size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={aim.body}>
-            {/* Suggestions */}
+          <ScrollView
+            ref={scrollRef}
+            showsVerticalScrollIndicator={false}
+            style={aim.body}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Starter prompts */}
             {messages.length === 0 && (
               <>
-                <Text style={aim.sectionLabel}>AI Insights</Text>
-                {AI_SUGGESTIONS.map((s, i) => (
-                  <View key={i} style={aim.suggestionCard}>
-                    <View style={[aim.sugIcon, { backgroundColor: `${s.color}20` }]}>
-                      <Feather name={s.icon as any} size={16} color={s.color} />
-                    </View>
-                    <Text style={aim.sugText}>{s.text}</Text>
-                  </View>
-                ))}
-                <Text style={aim.sectionLabel}>Ask Me Anything</Text>
+                <Text style={aim.sectionLabel}>Ask me anything</Text>
+                <View style={aim.starterGrid}>
+                  {STARTER_PROMPTS.map((p, i) => (
+                    <Pressable key={i} onPress={() => send(p.text)} style={({ pressed }) => [aim.starterPill, pressed && { opacity: 0.75 }]}>
+                      <Text style={aim.starterEmoji}>{p.emoji}</Text>
+                      <Text style={aim.starterText}>{p.text}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               </>
             )}
+
+            {/* Messages */}
             {messages.map((m, i) => (
-              <View key={i} style={[aim.bubble, m.from === "user" ? aim.bubbleUser : aim.bubbleAi]}>
-                {m.from === "ai" && (
+              <View key={i} style={[aim.bubble, m.role === "user" ? aim.bubbleUser : aim.bubbleAi]}>
+                {m.role === "assistant" && (
                   <View style={aim.aiBubbleIcon}>
-                    <Feather name="cpu" size={11} color={Colors.primary} />
+                    <Feather name="cpu" size={11} color="#C084FC" />
                   </View>
                 )}
-                <Text style={[aim.bubbleText, m.from === "user" ? aim.bubbleTextUser : aim.bubbleTextAi]}>
-                  {m.text}
-                </Text>
+                {m.role === "user" ? (
+                  <LinearGradient colors={["#4F7FFF", "#7C3AED"]} style={aim.bubbleUserGrad}>
+                    <Text style={aim.bubbleTextUser}>{m.content}</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={aim.bubbleTextAi}>{m.content}</Text>
+                )}
               </View>
             ))}
+
+            {/* Typing indicator */}
+            {typing && (
+              <View style={[aim.bubble, aim.bubbleAi]}>
+                <View style={aim.aiBubbleIcon}>
+                  <Feather name="cpu" size={11} color="#C084FC" />
+                </View>
+                <View style={aim.typingBubble}>
+                  {[0, 1, 2].map((d) => (
+                    <View key={d} style={[aim.typingDot, { opacity: 0.4 + d * 0.2 }]} />
+                  ))}
+                </View>
+              </View>
+            )}
           </ScrollView>
 
           <View style={aim.inputRow}>
@@ -149,12 +212,18 @@ function AiAgentModal({ visible, onClose }: { visible: boolean; onClose: () => v
               onChangeText={setInput}
               placeholder="Ask about your cards, scores, tips…"
               placeholderTextColor={Colors.textMuted}
-              onSubmitEditing={send}
+              onSubmitEditing={() => send()}
+              editable={!typing}
+              multiline
             />
-            <Pressable onPress={send} style={[aim.sendBtn, !input.trim() && { opacity: 0.4 }]}>
-              <Feather name="send" size={16} color="#fff" />
+            <Pressable onPress={() => send()} style={[aim.sendBtn, (!input.trim() || typing) && { opacity: 0.4 }]} disabled={!input.trim() || typing}>
+              <LinearGradient colors={["#7C3AED", "#4F7FFF"]} style={aim.sendBtnGrad}>
+                <Feather name="send" size={15} color="#fff" />
+              </LinearGradient>
             </Pressable>
           </View>
+
+          <Text style={aim.disclaimer}>CardFlow AI provides general financial guidance only. Not a licensed financial advisor.</Text>
         </View>
       </View>
     </Modal>
@@ -162,74 +231,110 @@ function AiAgentModal({ visible, onClose }: { visible: boolean; onClose: () => v
 }
 
 const aim = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.72)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 12, maxHeight: "88%",
+    backgroundColor: "#0E0828",
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 12, maxHeight: "92%",
+    borderTopWidth: 1, borderColor: "rgba(192,132,252,0.25)",
   },
-  handle: { width: 36, height: 4, backgroundColor: Colors.divider, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
+  handle: { width: 36, height: 4, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 2, alignSelf: "center", marginBottom: 14 },
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   agentAvatar: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: "rgba(108,158,255,0.15)", borderWidth: 1.5,
-    borderColor: "rgba(108,158,255,0.4)", alignItems: "center", justifyContent: "center",
+    width: 46, height: 46, borderRadius: 23,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: "rgba(192,132,252,0.4)",
+    position: "relative", overflow: "hidden",
+  },
+  avatarGlow: {
+    position: "absolute", width: 30, height: 30,
+    borderRadius: 15, backgroundColor: "rgba(192,132,252,0.25)",
   },
   headerInfo: { flex: 1, gap: 2 },
   title: { fontFamily: "Inter_700Bold", fontSize: 17, color: Colors.textPrimary },
   onlineRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   onlineDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.positive },
   onlineText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.positive },
+  clearBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center" },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  body: { marginBottom: 12 },
+  body: { marginBottom: 10, flex: 1 },
   sectionLabel: {
     fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textMuted,
-    textTransform: "uppercase", letterSpacing: 1, marginBottom: 10, marginTop: 4,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 12, marginTop: 4,
   },
-  suggestionCard: {
-    flexDirection: "row", alignItems: "flex-start", gap: 12,
+  starterGrid: { gap: 8, marginBottom: 8 },
+  starterPill: {
+    flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 14,
-    borderWidth: 1, borderColor: Colors.divider, padding: 12, marginBottom: 8,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", padding: 12,
   },
-  sugIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  sugText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, flex: 1, lineHeight: 19 },
-  bubble: { marginBottom: 10, maxWidth: "82%" },
-  bubbleUser: { alignSelf: "flex-end", backgroundColor: Colors.primaryDark, borderRadius: 16, borderBottomRightRadius: 4, padding: 12 },
-  bubbleAi: { alignSelf: "flex-start", flexDirection: "row", gap: 8, alignItems: "flex-start" },
+  starterEmoji: { fontSize: 18 },
+  starterText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, flex: 1, lineHeight: 19 },
+  bubble: { marginBottom: 10, maxWidth: "85%" },
+  bubbleUser: { alignSelf: "flex-end" },
+  bubbleAi: { alignSelf: "flex-start", flexDirection: "row", gap: 8, alignItems: "flex-start", maxWidth: "90%" },
   aiBubbleIcon: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(108,158,255,0.15)",
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: "rgba(192,132,252,0.15)", borderWidth: 1, borderColor: "rgba(192,132,252,0.3)",
     alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2,
   },
-  bubbleText: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },
-  bubbleTextUser: { color: "#fff" },
+  bubbleUserGrad: { borderRadius: 18, borderBottomRightRadius: 4, padding: 12 },
+  bubbleTextUser: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20, color: "#fff" },
   bubbleTextAi: {
-    color: Colors.textPrimary, backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, flex: 1,
+    fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21, color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 18, borderBottomLeftRadius: 4,
+    padding: 12, flex: 1,
   },
-  inputRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  typingBubble: {
+    flexDirection: "row", gap: 5, alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 18, borderBottomLeftRadius: 4,
+    padding: 14,
+  },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#C084FC" },
+  inputRow: { flexDirection: "row", gap: 10, alignItems: "flex-end", marginBottom: 8 },
   input: {
     flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textPrimary,
     backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 22, paddingHorizontal: 16,
-    paddingVertical: 12, borderWidth: 1, borderColor: Colors.divider,
+    paddingVertical: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+    maxHeight: 100,
   },
-  sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryDark,
-    alignItems: "center", justifyContent: "center",
+  sendBtn: { width: 46, height: 46, borderRadius: 23 },
+  sendBtnGrad: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
+  disclaimer: {
+    fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textMuted,
+    textAlign: "center", lineHeight: 14, paddingBottom: 4,
   },
 });
 
 // ─── Notifications Modal ──────────────────────────────────────────────────────
 
-const CREDIT_NOTIFICATIONS = [
-  { id: "1", icon: "arrow-up", color: "#4ADEAA", title: "Score Increased", body: "Your TransUnion score jumped +8 pts to 745 this week.", time: "2h ago", unread: true },
-  { id: "2", icon: "alert-triangle", color: "#FBBF24", title: "High Utilization Alert", body: "Travel Elite is now at 78% utilization — above the recommended 30%.", time: "1d ago", unread: true },
-  { id: "3", icon: "calendar", color: "#6C9EFF", title: "Payment Due Soon", body: "Platinum Rewards payment of $680 is due in 5 days.", time: "2d ago", unread: false },
-  { id: "4", icon: "check-circle", color: "#4ADEAA", title: "Payment Confirmed", body: "ACH payment of $750 to Travel Elite was processed successfully.", time: "3d ago", unread: false },
-  { id: "5", icon: "gift", color: "#FF6B9D", title: "Rewards Milestone", body: "You've earned 130,000 points — enough for a $650 flight redemption!", time: "5d ago", unread: false },
+type NotifItem = { id: string; icon: string; color: string; title: string; body: string; time: string; unread: boolean };
+
+const INITIAL_NOTIFICATIONS: NotifItem[] = [
+  { id: "1", icon: "alert-circle",   color: "#FF6B8A", title: "Payment due in 3 days",        body: "Platinum Rewards payment of $680 is due on May 2nd. Set up auto-pay to avoid late fees.", time: "Just now",  unread: true  },
+  { id: "2", icon: "alert-triangle", color: "#FBBF24", title: "Budget alert — Dining at 85%",  body: "You have spent $255 of your $300 dining budget this month. Approaching your limit.", time: "1h ago",    unread: true  },
+  { id: "3", icon: "percent",        color: "#4ADEAA", title: "Cash back milestone",            body: "You've earned $313 in cash back this month — a new personal record! Redeem before statement close.", time: "2h ago",    unread: true  },
+  { id: "4", icon: "repeat",         color: "#6C9EFF", title: "Subscription charge in 2 days", body: "Adobe Creative Cloud charges $54.99 on May 1st to your Cash Back Gold card.", time: "5h ago",    unread: false },
+  { id: "5", icon: "zap",            color: "#C084FC", title: "AI Insight",                    body: "Your Platinum Rewards card earns 3× points on travel. Your upcoming charges make it ideal for this month.", time: "1d ago",    unread: false },
+  { id: "6", icon: "arrow-up",       color: "#4ADEAA", title: "Score Increased",               body: "Your TransUnion score jumped +8 pts to 745 this week. Keep utilization below 30% to continue improving.", time: "2d ago",    unread: false },
+  { id: "7", icon: "check-circle",   color: "#4ADEAA", title: "Payment Confirmed",             body: "ACH payment of $750 to Travel Elite was processed successfully.", time: "3d ago",    unread: false },
+  { id: "8", icon: "gift",           color: "#FF6B8A", title: "Rewards Milestone",             body: "You've earned 130,000 points — enough for a $650 flight redemption!", time: "5d ago",    unread: false },
 ];
 
-function NotificationsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function NotificationsModal({ visible, onClose, onUnreadChange }: {
+  visible: boolean;
+  onClose: () => void;
+  onUnreadChange: (count: number) => void;
+}) {
   const insets = useSafeAreaInsets();
-  const unreadCount = CREDIT_NOTIFICATIONS.filter((n) => n.unread).length;
+  const [notifs, setNotifs] = useState<NotifItem[]>(INITIAL_NOTIFICATIONS);
+  const unreadCount = notifs.filter((n) => n.unread).length;
+
+  useEffect(() => { onUnreadChange(unreadCount); }, [unreadCount]);
+
+  const markRead = (id: string) => setNotifs((n) => n.map((x) => x.id === id ? { ...x, unread: false } : x));
+  const markAllRead = () => setNotifs((n) => n.map((x) => ({ ...x, unread: false })));
+  const clearAll = () => setNotifs([]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -237,33 +342,44 @@ function NotificationsModal({ visible, onClose }: { visible: boolean; onClose: (
         <View style={[nm.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={nm.handle} />
           <View style={nm.header}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={nm.title}>Notifications</Text>
-              {unreadCount > 0 && (
-                <Text style={nm.unreadLabel}>{unreadCount} unread</Text>
-              )}
+              {unreadCount > 0 && <Text style={nm.unreadLabel}>{unreadCount} unread</Text>}
             </View>
+            <Pressable onPress={markAllRead} style={nm.actionBtn}>
+              <Text style={nm.actionText}>Mark all read</Text>
+            </Pressable>
+            <Pressable onPress={clearAll} style={nm.actionBtn}>
+              <Text style={[nm.actionText, { color: "#FF6B8A" }]}>Clear</Text>
+            </Pressable>
             <Pressable onPress={onClose} style={nm.closeBtn}>
               <Feather name="x" size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
+
           <ScrollView showsVerticalScrollIndicator={false}>
-            {CREDIT_NOTIFICATIONS.map((n, i) => (
+            {notifs.length === 0 && (
+              <View style={nm.empty}>
+                <Feather name="bell-off" size={32} color={Colors.textMuted} />
+                <Text style={nm.emptyText}>No notifications</Text>
+              </View>
+            )}
+            {notifs.map((n, i) => (
               <React.Fragment key={n.id}>
                 {i > 0 && <View style={nm.divider} />}
-                <View style={[nm.item, n.unread && nm.itemUnread]}>
+                <Pressable onPress={() => markRead(n.id)} style={[nm.item, n.unread && nm.itemUnread]}>
                   <View style={[nm.iconWrap, { backgroundColor: `${n.color}18` }]}>
                     <Feather name={n.icon as any} size={17} color={n.color} />
                     {n.unread && <View style={[nm.badge, { backgroundColor: n.color }]} />}
                   </View>
                   <View style={nm.itemBody}>
                     <View style={nm.itemTop}>
-                      <Text style={nm.itemTitle}>{n.title}</Text>
+                      <Text style={nm.itemTitle} numberOfLines={1}>{n.title}</Text>
                       <Text style={nm.itemTime}>{n.time}</Text>
                     </View>
                     <Text style={nm.itemText}>{n.body}</Text>
                   </View>
-                </View>
+                </Pressable>
               </React.Fragment>
             ))}
           </ScrollView>
@@ -280,9 +396,11 @@ const nm = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 12, maxHeight: "85%",
   },
   handle: { width: 36, height: 4, backgroundColor: Colors.divider, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
-  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },
   title: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.textPrimary },
   unreadLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.primary, marginTop: 2 },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  actionText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.primary },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
   divider: { height: 1, backgroundColor: Colors.divider, marginLeft: 56 },
   item: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12 },
@@ -291,31 +409,33 @@ const nm = StyleSheet.create({
   badge: { position: "absolute", top: -2, right: -2, width: 9, height: 9, borderRadius: 4.5, borderWidth: 1.5, borderColor: "#1C1048" },
   itemBody: { flex: 1, gap: 3 },
   itemTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  itemTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textPrimary },
-  itemTime: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted },
+  itemTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textPrimary, flex: 1, marginRight: 8 },
+  itemTime: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textMuted, flexShrink: 0 },
   itemText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
+  empty: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textMuted },
 });
 
 // ─── Floating Bubble Menu ─────────────────────────────────────────────────────
 
 const BUBBLES = [
-  { key: "mail",     icon: "mail",     label: "Notifications", size: 44, color: "#6C9EFF", bg: "rgba(108,158,255,0.18)" },
-  { key: "agent",    icon: "cpu",      label: "AI Agent",      size: 54, color: "#C084FC", bg: "rgba(192,132,252,0.18)" },
-  { key: "download", icon: "download", label: "Statements",    size: 44, color: "#4ADEAA", bg: "rgba(74,222,170,0.18)" },
+  { key: "mail",    icon: "bell",        label: "Notifications", size: 44, color: "#6C9EFF", bg: "rgba(108,158,255,0.18)" },
+  { key: "agent",   icon: "cpu",         label: "AI Agent",      size: 54, color: "#C084FC", bg: "rgba(192,132,252,0.18)" },
+  { key: "budget",  icon: "bar-chart-2", label: "Budgeting",     size: 44, color: "#4ADEAA", bg: "rgba(74,222,170,0.18)" },
 ];
 
-// Y offsets above the FAB (bottom-to-top: download, agent, mail)
 const BUBBLE_OFFSETS = [72, 142, 206];
 
 type FloatingBubbleMenuProps = {
   fabScaleAnim: Animated.Value;
   onAiOpen: () => void;
   onNotifOpen: () => void;
-  onStatementsOpen: () => void;
+  onBudgetOpen: () => void;
   bottomOffset: number;
+  notifUnread: number;
 };
 
-function FloatingBubbleMenu({ fabScaleAnim, onAiOpen, onNotifOpen, onStatementsOpen, bottomOffset }: FloatingBubbleMenuProps) {
+function FloatingBubbleMenu({ fabScaleAnim, onAiOpen, onNotifOpen, onBudgetOpen, bottomOffset, notifUnread }: FloatingBubbleMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const anim0 = useRef(new Animated.Value(0)).current;
@@ -345,41 +465,33 @@ function FloatingBubbleMenu({ fabScaleAnim, onAiOpen, onNotifOpen, onStatementsO
   };
 
   const handleBubble = (key: string) => {
-    if (key === "agent")    closeMenu(onAiOpen);
-    if (key === "mail")     closeMenu(onNotifOpen);
-    if (key === "download") closeMenu(onStatementsOpen);
+    if (key === "agent")  closeMenu(onAiOpen);
+    if (key === "mail")   closeMenu(onNotifOpen);
+    if (key === "budget") closeMenu(onBudgetOpen);
   };
 
   const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "225deg"] });
 
   return (
     <>
-      {/* Tap-outside to close */}
       {menuOpen && (
         <Pressable style={[StyleSheet.absoluteFill, fb.backdrop]} onPress={() => closeMenu()} />
       )}
 
-      {/* Fixed position cluster */}
       <View style={[fb.cluster, { bottom: bottomOffset }]}>
-        {/* Bubbles (rendered bottom-to-top: index 0=download, 1=agent, 2=mail) */}
         {BUBBLES.map((bubble, i) => {
           const anim = bubbleAnims[i];
           const offset = BUBBLE_OFFSETS[i];
+          const isNotif = bubble.key === "mail";
           return (
             <Animated.View
               key={bubble.key}
               style={[
                 fb.bubbleWrap,
                 { bottom: offset },
-                {
-                  opacity: anim,
-                  transform: [
-                    { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
-                  ],
-                },
+                { opacity: anim, transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] },
               ]}
             >
-              {/* Label on left */}
               <View style={fb.labelWrap}>
                 <Text style={fb.labelText}>{bubble.label}</Text>
               </View>
@@ -387,36 +499,35 @@ function FloatingBubbleMenu({ fabScaleAnim, onAiOpen, onNotifOpen, onStatementsO
                 onPress={() => handleBubble(bubble.key)}
                 style={({ pressed }) => [
                   fb.bubble,
-                  {
-                    width: bubble.size,
-                    height: bubble.size,
-                    borderRadius: bubble.size / 2,
-                    backgroundColor: bubble.bg,
-                    borderColor: `${bubble.color}70`,
-                  },
+                  { width: bubble.size, height: bubble.size, borderRadius: bubble.size / 2, backgroundColor: bubble.bg, borderColor: `${bubble.color}70` },
                   pressed && { opacity: 0.75 },
                 ]}
               >
-                <Feather
-                  name={bubble.icon as any}
-                  size={bubble.key === "agent" ? 23 : 18}
-                  color={bubble.color}
-                />
+                <Feather name={bubble.icon as any} size={bubble.key === "agent" ? 23 : 18} color={bubble.color} />
+                {isNotif && notifUnread > 0 && (
+                  <View style={fb.notifBadge}>
+                    <Text style={fb.notifBadgeText}>{notifUnread > 9 ? "9+" : notifUnread}</Text>
+                  </View>
+                )}
               </Pressable>
             </Animated.View>
           );
         })}
 
-        {/* Main FAB */}
+        {/* Main FAB — unread dot when closed */}
         <Animated.View style={[fb.fabWrap, { transform: [{ scale: fabScaleAnim }] }]}>
+          {notifUnread > 0 && !menuOpen && (
+            <View style={fb.fabBadge}>
+              <Text style={fb.fabBadgeText}>{notifUnread > 9 ? "9+" : notifUnread}</Text>
+            </View>
+          )}
           <Pressable
             onPress={() => (menuOpen ? closeMenu() : openMenu())}
             style={({ pressed }) => [fb.fabPress, pressed && { opacity: 0.85 }]}
           >
             <LinearGradient
               colors={["#7C3AED", "#4F7FFF"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={fb.fabGrad}
             >
               <Animated.View style={{ transform: [{ rotate }] }}>
@@ -431,105 +542,32 @@ function FloatingBubbleMenu({ fabScaleAnim, onAiOpen, onNotifOpen, onStatementsO
 }
 
 const fb = StyleSheet.create({
-  backdrop: {
-    backgroundColor: "rgba(8,4,24,0.55)",
-    zIndex: 90,
-  },
-  cluster: {
-    position: "absolute",
-    right: 16,
-    alignItems: "center",
-    zIndex: 100,
-  },
-  bubbleWrap: {
-    position: "absolute",
-    right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  bubble: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-  },
+  backdrop: { backgroundColor: "rgba(8,4,24,0.55)", zIndex: 90 },
+  cluster: { position: "absolute", right: 16, alignItems: "center", zIndex: 100 },
+  bubbleWrap: { position: "absolute", right: 0, flexDirection: "row", alignItems: "center", gap: 10 },
+  bubble: { alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
   labelWrap: {
-    backgroundColor: "rgba(12,6,32,0.9)",
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(12,6,32,0.9)", paddingHorizontal: 11, paddingVertical: 5,
+    borderRadius: 9, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
   },
-  labelText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: Colors.textPrimary,
-  },
-  fabWrap: {},
+  labelText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textPrimary },
+  fabWrap: { position: "relative" },
   fabPress: {},
-  fabGrad: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: "center",
-    justifyContent: "center",
+  fabGrad: { width: 58, height: 58, borderRadius: 29, alignItems: "center", justifyContent: "center" },
+  notifBadge: {
+    position: "absolute", top: -4, right: -4,
+    backgroundColor: "#FF6B8A", borderRadius: 9, minWidth: 18, height: 18,
+    alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#0D0A1E",
+    paddingHorizontal: 3,
   },
-});
-
-// ─── Statements Modal (simple) ────────────────────────────────────────────────
-
-const MONTHS = ["February 2025", "January 2025", "December 2024", "November 2024"];
-
-function StatementsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={stm.overlay}>
-        <View style={[stm.sheet, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={stm.handle} />
-          <View style={stm.header}>
-            <Text style={stm.title}>Statements</Text>
-            <Pressable onPress={onClose} style={stm.closeBtn}>
-              <Feather name="x" size={20} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {MONTHS.map((m, i) => (
-              <React.Fragment key={m}>
-                {i > 0 && <View style={stm.divider} />}
-                <Pressable style={({ pressed }) => [stm.row, pressed && { opacity: 0.7 }]}>
-                  <View style={stm.rowIcon}>
-                    <Feather name="file-text" size={17} color={Colors.primary} />
-                  </View>
-                  <View style={stm.rowInfo}>
-                    <Text style={stm.rowTitle}>{m}</Text>
-                    <Text style={stm.rowSub}>PDF · 3 cards</Text>
-                  </View>
-                  <Feather name="download" size={16} color={Colors.textMuted} />
-                </Pressable>
-              </React.Fragment>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const stm = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: "60%" },
-  handle: { width: 36, height: 4, backgroundColor: Colors.divider, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-  title: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.textPrimary },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  divider: { height: 1, backgroundColor: Colors.divider, marginLeft: 56 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14 },
-  rowIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(108,158,255,0.1)", alignItems: "center", justifyContent: "center" },
-  rowInfo: { flex: 1 },
-  rowTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textPrimary },
-  rowSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted },
+  notifBadgeText: { fontFamily: "Inter_700Bold", fontSize: 10, color: "#fff" },
+  fabBadge: {
+    position: "absolute", top: -4, right: -4, zIndex: 10,
+    backgroundColor: "#FF6B8A", borderRadius: 9, minWidth: 18, height: 18,
+    alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#0D0A1E",
+    paddingHorizontal: 3,
+  },
+  fabBadgeText: { fontFamily: "Inter_700Bold", fontSize: 10, color: "#fff" },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -562,13 +600,13 @@ export default function CardListScreen() {
   };
 
   // ── Modal visibility ──────────────────────────────────────────────────────
-  const [aiVisible, setAiVisible] = useState(false);
-  const [notifVisible, setNotifVisible] = useState(false);
-  const [stmVisible, setStmVisible] = useState(false);
+  const [aiVisible,     setAiVisible]     = useState(false);
+  const [notifVisible,  setNotifVisible]  = useState(false);
+  const [budgetVisible, setBudgetVisible] = useState(false);
+  const [notifUnread,   setNotifUnread]   = useState(3);
 
   return (
     <LinearGradient colors={[effectiveBgStart, effectiveBgEnd]} style={styles.gradient}>
-      {/* Damask texture overlay */}
       <Image
         source={require("../../assets/images/bg-damask.png")}
         style={styles.bgTexture}
@@ -587,24 +625,24 @@ export default function CardListScreen() {
         <WalletCardStack cards={cards} transactionCounts={transactionCounts} />
         <SubscriptionsRow />
         <PlaidLinkedCards />
-        <CreditProfileSection status="success" />
+        <CreditProfileSection status="success" onSimulate={() => setAiVisible(true)} />
         <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
           <SupportSection />
         </View>
       </ScrollView>
 
-      {/* Floating Bubble Menu */}
       <FloatingBubbleMenu
         fabScaleAnim={fabScaleAnim}
         onAiOpen={() => setAiVisible(true)}
         onNotifOpen={() => setNotifVisible(true)}
-        onStatementsOpen={() => setStmVisible(true)}
+        onBudgetOpen={() => setBudgetVisible(true)}
         bottomOffset={insets.bottom + 80}
+        notifUnread={notifUnread}
       />
 
       <AiAgentModal visible={aiVisible} onClose={() => setAiVisible(false)} />
-      <NotificationsModal visible={notifVisible} onClose={() => setNotifVisible(false)} />
-      <StatementsModal visible={stmVisible} onClose={() => setStmVisible(false)} />
+      <NotificationsModal visible={notifVisible} onClose={() => setNotifVisible(false)} onUnreadChange={setNotifUnread} />
+      <BudgetingScreen visible={budgetVisible} onClose={() => setBudgetVisible(false)} />
     </LinearGradient>
   );
 }

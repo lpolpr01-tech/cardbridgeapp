@@ -69,6 +69,7 @@ export interface CreditProfileData {
   debtSummary: DebtSummaryData;
   scoreFactors: ScoreFactor[];
   recommendations: Recommendation[];
+  onSimulate?: () => void;
 }
 
 export type CreditProfileStatus = "loading" | "success" | "partial" | "no_data" | "error";
@@ -429,6 +430,21 @@ export function CreditScoreOverviewCard({ data }: { data: CreditProfileData }) {
             Scores are educational estimates and may differ from lender-grade reports.
           </Text>
         </View>
+
+        {/* Score Simulator button */}
+        {data.onSimulate && (
+          <Pressable onPress={data.onSimulate} style={({ pressed }) => [cs.simBtn, pressed && { opacity: 0.8 }]}>
+            <LinearGradient
+              colors={["rgba(124,58,237,0.22)", "rgba(79,127,255,0.22)"]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={cs.simBtnGrad}
+            >
+              <Feather name="bar-chart-2" size={14} color="#C084FC" />
+              <Text style={cs.simBtnText}>Simulate Score Changes</Text>
+              <Feather name="chevron-right" size={13} color="rgba(192,132,252,0.6)" />
+            </LinearGradient>
+          </Pressable>
+        )}
       </View>
     </FadeSlideIn>
   );
@@ -1201,9 +1217,10 @@ export function PersonalizedRecommendationsCard({ recommendations }: { recommend
 interface CreditProfileSectionProps {
   status?: CreditProfileStatus;
   data?: CreditProfileData;
+  onSimulate?: () => void;
 }
 
-export function CreditProfileSection({ status = "success", data = MOCK_CREDIT_DATA }: CreditProfileSectionProps) {
+export function CreditProfileSection({ status = "success", data = MOCK_CREDIT_DATA, onSimulate }: CreditProfileSectionProps) {
   if (status === "loading") {
     return (
       <View style={root.section}>
@@ -1249,7 +1266,7 @@ export function CreditProfileSection({ status = "success", data = MOCK_CREDIT_DA
         </View>
       </View>
 
-      <CreditScoreOverviewCard data={data} />
+      <CreditScoreOverviewCard data={{ ...data, onSimulate }} />
       <CreditHealthCard data={data.creditHealth} />
       <DebtSummaryCard data={data.debtSummary} />
       <ScoreFactorsCard factors={data.scoreFactors} />
@@ -1339,6 +1356,9 @@ const cs = StyleSheet.create({
   changeText: { fontFamily: "Inter_700Bold", fontSize: 9 },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
   disclaimer: { fontFamily: "Inter_400Regular", fontSize: 9.5, color: Colors.textMuted, lineHeight: 14, flex: 1, textAlign: "right" },
+  simBtn: { marginTop: 12, borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: "rgba(192,132,252,0.25)" },
+  simBtnGrad: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  simBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#C084FC", flex: 1 },
 });
 
 // Credit Health styles

@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -19,6 +20,71 @@ import Colors from "@/constants/colors";
 import { apiUrl } from "@/constants/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, type PlaidLinkedAccount } from "@/context/FinanceContext";
+
+// ─── Institution → clearbit domain mapping ────────────────────────────────────
+
+const INST_DOMAIN: Record<string, string> = {
+  "Chase":              "chase.com",
+  "Bank of America":   "bankofamerica.com",
+  "Wells Fargo":       "wellsfargo.com",
+  "Citi":              "citi.com",
+  "Citibank":          "citi.com",
+  "Capital One":       "capitalone.com",
+  "American Express":  "americanexpress.com",
+  "Discover":          "discover.com",
+  "TD Bank":           "td.com",
+  "US Bank":           "usbank.com",
+  "Ally":              "ally.com",
+  "SoFi":              "sofi.com",
+  "Marcus":            "marcus.com",
+  "Goldman Sachs":     "goldmansachs.com",
+  "Fidelity":          "fidelity.com",
+  "Charles Schwab":    "schwab.com",
+  "Navy Federal":      "navyfederal.org",
+  "USAA":              "usaa.com",
+  "PNC":               "pnc.com",
+  "Truist":            "truist.com",
+  "Citizens Bank":     "citizensbank.com",
+  "Regions":           "regions.com",
+  "KeyBank":           "key.com",
+  "Santander":         "santander.com",
+  "BMO Harris":        "bmoharris.com",
+  "Fifth Third":       "53.com",
+  "Huntington":        "huntington.com",
+};
+
+function getClearbitUrl(institutionName: string): string | null {
+  if (!institutionName) return null;
+  const domain = INST_DOMAIN[institutionName]
+    ?? Object.entries(INST_DOMAIN).find(([k]) => institutionName.toLowerCase().includes(k.toLowerCase()))?.[1];
+  if (!domain) return null;
+  return `https://logo.clearbit.com/${domain}`;
+}
+
+function InstitutionLogo({ name, size = 28, borderRadius = 8 }: { name: string; size?: number; borderRadius?: number }) {
+  const [failed, setFailed] = useState(false);
+  const url = getClearbitUrl(name);
+  if (!url || failed) {
+    return (
+      <View style={[logoS.fallback, { width: size, height: size, borderRadius }]}>
+        <Text style={logoS.fallbackText}>{name.charAt(0).toUpperCase()}</Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: url }}
+      style={{ width: size, height: size, borderRadius, backgroundColor: "#fff" }}
+      onError={() => setFailed(true)}
+      resizeMode="contain"
+    />
+  );
+}
+
+const logoS = StyleSheet.create({
+  fallback: { backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  fallbackText: { fontFamily: "Inter_700Bold", fontSize: 12, color: "#fff" },
+});
 
 const CARD_WIDTH = 230;
 const CARD_HEIGHT = 148;
@@ -89,11 +155,9 @@ function AccountCard({
         {/* Decorative circle */}
         <View style={cardS.decorCircle} pointerEvents="none" />
 
-        {/* Top row: icon + badge + visibility toggle */}
+        {/* Top row: logo + badge + visibility toggle */}
         <View style={cardS.topRow}>
-          <View style={cardS.iconBg}>
-            <Feather name="credit-card" size={14} color="rgba(255,255,255,0.9)" />
-          </View>
+          <InstitutionLogo name={account.institutionName ?? ""} size={28} borderRadius={7} />
           <View style={cardS.typeBadge}>
             <Text style={cardS.typeBadgeText}>{badge}</Text>
           </View>
@@ -179,7 +243,12 @@ function AddBankCard({
               <Feather name="plus" size={20} color={Colors.primary} />
             </View>
             <Text style={cardS.addLabel}>Link Bank</Text>
-            <Text style={cardS.addSub}>via Plaid</Text>
+            <View style={cardS.addPlaidRow}>
+              <Text style={cardS.addPlaidPowered}>Secured by</Text>
+              <View style={cardS.addPlaidBadge}>
+                <Text style={cardS.addPlaidText}>plaid</Text>
+              </View>
+            </View>
           </>
         )}
       </LinearGradient>
@@ -240,12 +309,12 @@ function InstitutionCarousel({
     <View style={groupS.wrap}>
       {/* Institution header */}
       <View style={groupS.header}>
-        <View style={groupS.institutionIcon}>
-          <Feather name="home" size={13} color={Colors.primary} />
-        </View>
+        <InstitutionLogo name={institutionName} size={24} borderRadius={6} />
         <Text style={groupS.name} numberOfLines={1}>
           {institutionName}
         </Text>
+        <View style={groupS.connectedDot} />
+        <Text style={groupS.connectedText}>Connected</Text>
         <View style={groupS.countBadge}>
           <Text style={groupS.countText}>
             {visibleCount}/{accounts.length} shown
@@ -525,6 +594,8 @@ const groupS = StyleSheet.create({
     color: Colors.textPrimary,
     flex: 1,
   },
+  connectedDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#4ADEAA" },
+  connectedText: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#4ADEAA" },
   countBadge: {
     backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 6,
@@ -692,6 +763,12 @@ const cardS = StyleSheet.create({
     fontSize: 10,
     color: Colors.textSecondary,
   },
+  addPlaidRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  addPlaidPowered: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textMuted },
+  addPlaidBadge: {
+    backgroundColor: "#00B4DB", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2,
+  },
+  addPlaidText: { fontFamily: "Inter_700Bold", fontSize: 9, color: "#fff", letterSpacing: 0.5 },
 });
 
 const dotS = StyleSheet.create({

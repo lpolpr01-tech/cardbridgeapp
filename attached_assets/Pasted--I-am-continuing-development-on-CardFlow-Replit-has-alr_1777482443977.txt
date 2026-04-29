@@ -1,0 +1,108 @@
+"I am continuing development on CardFlow. Replit has already implemented the previous round of updates. Now implement the following new features without breaking anything existing:
+
+## 1. REPLACE STATEMENTS BUTTON WITH BUDGETING
+Remove the Statements button entirely from the floating action menu. Replace it with a "Budgeting" button using a budget/chart icon (📊 or a bar chart icon). Tapping it opens a full Budgeting screen as described in section 3 below.
+
+## 2. AI FINANCIAL AGENT — EMBEDDED CHAT ASSISTANT
+The AI Agent button already exists in the floating action menu. Wire it up to a fully functional AI chat assistant using the Anthropic Claude API (claude-sonnet-4-20250514 model). Requirements:
+Setup:
+- Store the Anthropic API key in Replit Secrets as ANTHROPIC_API_KEY
+- Create a backend API route: POST /api/ai-agent that proxies the request to Anthropic — never expose the API key to the frontend
+UI — Chat Screen:
+- Opens as a full screen modal or slide-up panel with a dark purple frosted glass background
+- Header: "CardFlow AI" with a small glowing purple AI icon, subtitle "Your personal finance assistant"
+- Chat bubble interface: user messages right-aligned (blue/purple gradient), AI messages left-aligned (dark frosted glass)
+- Typing indicator (animated dots) while AI is responding
+- Input bar at the bottom with a send button
+- Suggested starter prompts shown before first message:
+"💳 Which card should I use for dining?"
+"📊 Analyze my spending this month"
+"💰 How do I maximize my cash back?"
+"📅 When is my next payment due?"
+"🏦 Explain APR vs interest rate"
+"📈 How do I improve my credit score?"
+AI System Prompt (send this as the system message on every request):
+"You are CardFlow AI, an expert financial assistant embedded in the CardFlow app. You specialize in: credit cards, rewards optimization, cash back strategies, budgeting, debt payoff strategies, APR calculations, credit score improvement, financial planning, investment basics, and all areas of personal finance. You have access to the user's card data context provided in each message. Always be concise, friendly, and actionable. When doing math, show your work clearly. Never give specific investment advice or guarantee returns. Always remind users to consult a licensed financial advisor for major decisions. Format responses with clear sections when helpful. You are not a general assistant — stay focused on financial topics."
+Context injection — with every API call, include the user's live data:
+"User context: Cards: [list card names, balances, limits, utilization %]. Total balance: [X]. Credit score: [X]. Monthly subscriptions: $[X]/mo. Total cash back earned: $[X]. Rewards points: [X]pts."
+Capabilities the AI should handle:
+- Credit card comparison and recommendations
+- Spending analysis based on actual transaction data
+- Debt payoff calculations (avalanche vs snowball method)
+- Cash back and rewards optimization ("use card X for category Y")
+- Budget recommendations based on spending patterns
+- Credit utilization advice
+- APR and interest calculations
+- Bill timing and payment due date reminders
+- Subscription audit ("you could save $X by canceling Y")
+- Any financial math: compound interest, loan amortization, investment returns
+- Keep full conversation history within the session
+- Add a "Clear Chat" button in the header
+- Add a disclaimer at the bottom: "CardFlow AI provides general financial guidance only. Not a licensed financial advisor."
+
+## 3. BUDGETING SCREEN — FULL FINANCIAL PLANNER
+Create a comprehensive Budgeting screen that opens from the new Budgeting button. This should meet standards that a certified financial planner would approve of:
+Section 1 — Monthly Budget Overview:
+- Large donut chart showing: Spent vs Remaining vs Saved this month
+- Month selector to navigate previous months
+- At a glance: Total Income, Total Spent, Total Saved, Savings Rate %
+Section 2 — Budget Categories (50/30/20 Rule as default framework):
+- Needs (50%): Housing, Utilities, Groceries, Transport, Insurance, Minimum debt payments
+- Wants (30%): Dining, Entertainment, Shopping, Subscriptions, Travel
+- Savings & Debt (20%): Emergency fund, Extra debt payments, Investments
+- Each category shows: budgeted amount, spent amount, progress bar, % used
+- Color coding: green (under 75%), yellow (75-90%), red (over 90%)
+- Tap any category to see the individual transactions that contributed to it
+Section 3 — Budget Goals:
+- Add custom savings goals with a name, target amount, target date, and linked account
+- Progress bar for each goal
+- Projected completion date based on current savings rate
+- Suggested monthly contribution to hit the goal on time
+- Goal types: Emergency Fund, Vacation, Debt Payoff, Large Purchase, Investment
+Section 4 — Debt Payoff Planner:
+- Auto-populate from linked credit cards
+- Show each card: balance, APR, minimum payment, payoff timeline at minimum payment
+- Toggle between Avalanche method (highest APR first) and Snowball method (lowest balance first)
+- Show total interest saved and months saved by choosing avalanche over minimum payments
+- Input field: "Extra monthly payment budget" — redistributes automatically
+Section 5 — Spending Insights (Financial Planner Approved):
+- "Your top spending category is X — financial planners recommend keeping this under Y% of income"
+- Subscription audit: "You are spending $199.87/mo on subscriptions. Consider reviewing these."
+- Credit utilization alert: "Your utilization is X% — keeping it under 30% improves your score"
+- Savings rate benchmark: "You are saving X% of income. Financial planners recommend 20%."
+- Monthly trend chart: last 6 months of spending by category as a stacked bar chart
+Section 6 — Budget Settings:
+- Set monthly income amount
+- Choose budget framework: 50/30/20 (default), 70/20/10, Zero-Based, Custom
+- Set custom budget amounts per category
+- Toggle budget alerts: notify when a category reaches 80% of budget
+Design: match the existing dark purple CardFlow theme, frosted glass section cards, same tab/pill navigation style as the rest of the app.
+
+## 4. CREDIT PROFILE SECTION ENHANCEMENTS
+The Credit Profile / Credit Scores section is already visible. Enhance it:
+- Show all three bureaus if available: Equifax, TransUnion, Experian
+- Color-coded score gauge: red (300-579), orange (580-669), yellow (670-739), green (740-799), teal (800-850)
+- Add score change indicator: ↑ or ↓ with points changed since last update
+- Add a "What's affecting my score?" section with factors: Payment History, Utilization, Account Age, Credit Mix, New Inquiries
+- Each factor shows a rating (Excellent/Good/Fair/Poor) and a one-line tip
+- Add a "Score Simulator" button that lets the user ask "What would happen to my score if I paid off Card X?" — this should feed into the AI Agent for a response
+
+## 5. NOTIFICATIONS SYSTEM
+The Notifications button exists in the floating menu. Wire it up:
+- Create a notifications panel that slides in from the right
+- Notification types to generate automatically:
+🔴 Payment due in 3 days — [Card Name]
+🟡 Budget alert — [Category] is at 85% of your budget
+🟢 Cash back milestone — You have earned $[X] in cash back this month
+🔵 Subscription reminder — [Service] charges $[X] in 2 days
+⭐ AI Insight — "Your Platinum Rewards card is best for your upcoming travel spending"
+- Mark as read / clear all functionality
+- Unread count badge on the notification button
+
+## 6. LINKED BANKS SECTION POLISH
+The Linked Banks section shows "Plaid · Sandbox" badge — keep this during beta. Add:
+- Each linked bank shows a small bank logo (use clearbit: https://logo.clearbit.com/{bankdomain}.com)
+Chase → chase.com, Bank of America → bankofamerica.com, Wells Fargo → wellsfargo.com, Citi → citi.com
+- If logo fails, use a bank 🏦 emoji fallback
+- Add a subtle green "Connected" dot next to each linked bank
+- The "Link Bank via Plaid" button should have a subtle Plaid logo/wordmark next to it
