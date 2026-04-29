@@ -24,7 +24,7 @@ router.post("/plaid/link-token", requireAuth, async (req, res) => {
 
   try {
     const response = await plaid.linkTokenCreate({
-      user: { client_user_id: req.userId! },
+      user: { client_user_id: req.user!.id },
       client_name: "Finance Dashboard",
       products: [Products.Transactions, Products.Auth],
       country_codes: [CountryCode.Us],
@@ -80,7 +80,7 @@ router.post("/plaid/exchange", requireAuth, async (req, res) => {
       institutionName,
     }));
 
-    addPlaidItem(req.userId!, {
+    addPlaidItem(req.user!.id, {
       accessToken: access_token,
       itemId: item_id,
       institutionName,
@@ -101,7 +101,7 @@ router.post("/plaid/exchange", requireAuth, async (req, res) => {
 // GET /api/plaid/accounts
 // Returns all linked Plaid accounts for the authenticated user
 router.get("/plaid/accounts", requireAuth, (req, res) => {
-  const accounts = getPlaidAccounts(req.userId!);
+  const accounts = getPlaidAccounts(req.user!.id);
   res.json({ accounts });
 });
 
@@ -121,7 +121,7 @@ router.post("/plaid/processor-token", requireAuth, async (req, res) => {
     return;
   }
 
-  const accessToken = getPlaidAccessToken(req.userId!, account_id);
+  const accessToken = getPlaidAccessToken(req.user!.id, account_id);
   if (!accessToken) {
     res.status(404).json({ error: "Account not found. Link your bank account first." });
     return;

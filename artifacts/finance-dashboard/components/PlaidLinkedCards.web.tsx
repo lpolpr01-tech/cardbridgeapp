@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
 import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -8,26 +9,17 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Colors from "@/constants/colors";
 import { apiUrl } from "@/constants/api";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/lib/auth";
 import { useFinance, type PlaidLinkedAccount } from "@/context/FinanceContext";
-
-const BETA_EMAIL =
-  (process.env["EXPO_PUBLIC_BETA_EMAIL"] as string | undefined) ??
-  "beta@finapp.com";
-const BETA_PASSWORD =
-  (process.env["EXPO_PUBLIC_BETA_PASSWORD"] as string | undefined) ??
-  "BetaTest2025!";
 
 const CARD_WIDTH = 230;
 const CARD_HEIGHT = 148;
@@ -50,76 +42,6 @@ function PlaidLinkOpener({
     if (ready) open();
   }, [ready, open]);
   return null;
-}
-
-// ─── Inline beta auth modal ───────────────────────────────────────────────────
-
-function LoginModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { login } = useAuth();
-  const [email, setEmail] = useState(BETA_EMAIL);
-  const [password, setPassword] = useState(BETA_PASSWORD);
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    setLoading(true);
-    try {
-      await login(email, password);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onClose();
-    } catch (e: unknown) {
-      Alert.alert("Login failed", (e as Error).message ?? "Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={loginS.overlay}>
-        <View style={loginS.sheet}>
-          <View style={loginS.handle} />
-          <View style={loginS.header}>
-            <Text style={loginS.title}>Sign In to Link Bank</Text>
-            <Pressable onPress={onClose} style={loginS.closeBtn}>
-              <Feather name="x" size={20} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-          <View style={loginS.badge}>
-            <Feather name="shield" size={14} color={Colors.positive} />
-            <Text style={loginS.badgeText}>Beta access · Plaid Sandbox</Text>
-          </View>
-          <Text style={loginS.label}>Email</Text>
-          <TextInput
-            style={loginS.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholderTextColor={Colors.textMuted}
-          />
-          <Text style={loginS.label}>Password</Text>
-          <TextInput
-            style={loginS.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholderTextColor={Colors.textMuted}
-          />
-          <Pressable
-            onPress={handleLogin}
-            disabled={loading}
-            style={({ pressed }) => [loginS.btn, pressed && { opacity: 0.8 }]}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={loginS.btnText}>Sign In</Text>
-            )}
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
 }
 
 // ─── Card type gradients ──────────────────────────────────────────────────────
@@ -372,19 +294,19 @@ function InstitutionCarousel({
 export function PlaidLinkedCards() {
   const { plaidAccounts, hiddenPlaidAccountIds, addPlaidAccounts, togglePlaidAccountVisibility } =
     useFinance();
-  const { token, isAuthenticated } = useAuth();
-  const [loginVisible, setLoginVisible] = useState(false);
+  const { isAuthenticated } = useAuth();
   const [linkLoading, setLinkLoading] = useState(false);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
 
   const fetchLinkToken = useCallback(async (): Promise<string | null> => {
-    if (!token) return null;
+    if (!isAuthenticated) return null;
     try {
+      const authToken = await SecureStore.getItemAsync("auth_session_token");
       const res = await fetch(apiUrl("/api/plaid/link-token"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
       });
       if (!res.ok) {
@@ -400,17 +322,18 @@ export function PlaidLinkedCards() {
       );
       return null;
     }
-  }, [token]);
+  }, [isAuthenticated]);
 
   const exchangeToken = useCallback(
     async (publicToken: string, institutionName: string) => {
-      if (!token) return;
+      if (!isAuthenticated) return;
       try {
+        const authToken = await SecureStore.getItemAsync("auth_session_token");
         const res = await fetch(apiUrl("/api/plaid/exchange"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
           },
           body: JSON.stringify({
             public_token: publicToken,
@@ -433,12 +356,11 @@ export function PlaidLinkedCards() {
         Alert.alert("Error", "Failed to link bank account.");
       }
     },
-    [token, addPlaidAccounts]
+    [isAuthenticated, addPlaidAccounts]
   );
 
   const handleAddBankPress = useCallback(async () => {
     if (!isAuthenticated) {
-      setLoginVisible(true);
       return;
     }
     if (Platform.OS !== "web") {
@@ -539,10 +461,6 @@ export function PlaidLinkedCards() {
         />
       )}
 
-      <LoginModal
-        visible={loginVisible}
-        onClose={() => setLoginVisible(false)}
-      />
     </View>
   );
 }
@@ -800,96 +718,5 @@ const dotS = StyleSheet.create({
   },
   dotInactive: {
     backgroundColor: Colors.divider,
-  },
-});
-
-const loginS = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: "#1C1048",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 40,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    backgroundColor: Colors.divider,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 20,
-    color: Colors.textPrimary,
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(74,222,170,0.1)",
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "rgba(74,222,170,0.2)",
-    marginBottom: 20,
-  },
-  badgeText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: Colors.positive,
-  },
-  label: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: Colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  input: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: Colors.textPrimary,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    marginBottom: 12,
-  },
-  btn: {
-    backgroundColor: Colors.primaryDark,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  btnText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: "#fff",
   },
 });

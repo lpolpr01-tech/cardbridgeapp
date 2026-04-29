@@ -42,15 +42,15 @@ router.post("/stripe/charge", requireAuth, async (req, res) => {
 
     // Find or create a Stripe customer for this user (keyed by beta-user ID)
     const existing = await stripe.customers.list({
-      metadata: { userId: req.userId! },
+      metadata: { userId: req.user!.id },
       limit: 1,
     });
     const customer =
       existing.data.length > 0
         ? existing.data[0]
         : await stripe.customers.create({
-            email: req.userEmail,
-            metadata: { userId: req.userId! },
+            email: req.user!.email ?? undefined,
+            metadata: { userId: req.user!.id },
           });
 
     // Use the Plaid processor token to create a Stripe bank account token

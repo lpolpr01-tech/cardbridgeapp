@@ -17,6 +17,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "jsonwebtoken": "^9.0.3",
+    "openid-client": "^6.8.4",
     "pino": "^9",
     "pino-http": "^10",
     "plaid": "^42.2.0",
