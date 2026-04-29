@@ -2,10 +2,12 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -20,13 +22,20 @@ import { apiUrl } from "@/constants/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, type PlaidLinkedAccount } from "@/context/FinanceContext";
 
-// ─── Beta login credentials pre-filled for sandbox testing ───────────────────
-const BETA_EMAIL = (process.env["EXPO_PUBLIC_BETA_EMAIL"] as string | undefined) ?? "beta@finapp.com";
-const BETA_PASSWORD = (process.env["EXPO_PUBLIC_BETA_PASSWORD"] as string | undefined) ?? "BetaTest2025!";
+const BETA_EMAIL =
+  (process.env["EXPO_PUBLIC_BETA_EMAIL"] as string | undefined) ??
+  "beta@finapp.com";
+const BETA_PASSWORD =
+  (process.env["EXPO_PUBLIC_BETA_PASSWORD"] as string | undefined) ??
+  "BetaTest2025!";
+
+const CARD_WIDTH = 230;
+const CARD_HEIGHT = 148;
+const CARD_GAP = 10;
+const SNAP_INTERVAL = CARD_WIDTH + CARD_GAP;
 
 // ─── Plaid Link opener (web-only) ─────────────────────────────────────────────
-// This component is only rendered when Platform.OS === 'web' and we have a link token.
-// Defined at module scope so React can track its identity stably.
+
 function PlaidLinkOpener({
   token,
   onPlaidSuccess,
@@ -37,15 +46,14 @@ function PlaidLinkOpener({
   onExit: () => void;
 }) {
   const { open, ready } = usePlaidLink({ token, onSuccess: onPlaidSuccess, onExit });
-
   useEffect(() => {
     if (ready) open();
   }, [ready, open]);
-
   return null;
 }
 
 // ─── Inline beta auth modal ───────────────────────────────────────────────────
+
 function LoginModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { login } = useAuth();
   const [email, setEmail] = useState(BETA_EMAIL);
@@ -114,52 +122,124 @@ function LoginModal({ visible, onClose }: { visible: boolean; onClose: () => voi
   );
 }
 
-// ─── Account card colours by Plaid account type ───────────────────────────────
+// ─── Card type gradients ──────────────────────────────────────────────────────
+
 const TYPE_GRADIENTS: Record<string, [string, string]> = {
-  depository: ["#1E5FAD", "#2C7DD6"],
-  credit: ["#6C3DB8", "#9B5CF5"],
-  investment: ["#2A7A5B", "#3EC48A"],
-  loan: ["#8B3A3A", "#C05050"],
+  depository: ["#1A4A8A", "#2563C4"],
+  credit:     ["#5A2D9A", "#8B5CF6"],
+  investment: ["#1A5F42", "#10B981"],
+  loan:       ["#7A2A2A", "#EF4444"],
 };
 
-function AccountCard({ account }: { account: PlaidLinkedAccount }) {
+// ─── Single account card ──────────────────────────────────────────────────────
+
+function AccountCard({
+  account,
+  isHidden,
+  onToggleVisibility,
+}: {
+  account: PlaidLinkedAccount;
+  isHidden: boolean;
+  onToggleVisibility: () => void;
+}) {
   const [c0, c1] = TYPE_GRADIENTS[account.type] ?? ["#2D1B69", "#1A103F"];
   const badge = account.subtype
     ? account.subtype.charAt(0).toUpperCase() + account.subtype.slice(1)
     : account.type.charAt(0).toUpperCase() + account.type.slice(1);
   const balance = account.balanceCurrent ?? account.balanceAvailable;
+  const fadeAnim = useRef(new Animated.Value(isHidden ? 0.45 : 1)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: isHidden ? 0.45 : 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [isHidden, fadeAnim]);
 
   return (
-    <View style={cardS.wrap}>
-      <LinearGradient colors={[c0, c1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cardS.grad}>
+    <Animated.View style={[cardS.wrap, { opacity: fadeAnim }]}>
+      <LinearGradient
+        colors={[c0, c1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={cardS.grad}
+      >
+        {/* Decorative circle */}
+        <View style={cardS.decorCircle} pointerEvents="none" />
+
+        {/* Top row: icon + badge + visibility toggle */}
         <View style={cardS.topRow}>
           <View style={cardS.iconBg}>
-            <Feather name="credit-card" size={15} color="rgba(255,255,255,0.9)" />
+            <Feather name="credit-card" size={14} color="rgba(255,255,255,0.9)" />
           </View>
           <View style={cardS.typeBadge}>
             <Text style={cardS.typeBadgeText}>{badge}</Text>
           </View>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              onToggleVisibility();
+            }}
+            style={({ pressed }) => [cardS.eyeBtn, pressed && { opacity: 0.7 }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather
+              name={isHidden ? "eye-off" : "eye"}
+              size={14}
+              color={isHidden ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.85)"}
+            />
+          </Pressable>
         </View>
-        <Text style={cardS.institution} numberOfLines={1}>{account.institutionName}</Text>
-        <Text style={cardS.name} numberOfLines={1}>{account.officialName ?? account.name}</Text>
+
+        {/* Institution + account name */}
+        <View style={cardS.mid}>
+          <Text style={cardS.institution} numberOfLines={1}>
+            {account.institutionName}
+          </Text>
+          <Text style={cardS.name} numberOfLines={1}>
+            {account.officialName ?? account.name}
+          </Text>
+        </View>
+
+        {/* Bottom row: mask + balance */}
         <View style={cardS.bottomRow}>
-          <Text style={cardS.mask}>{account.mask ? `•••• ${account.mask}` : "••••"}</Text>
+          <Text style={cardS.mask}>
+            {account.mask ? `•••• ${account.mask}` : "••••"}
+          </Text>
           {balance != null && (
             <Text style={cardS.balance}>
-              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balance)}
+              {isHidden
+                ? "••••"
+                : new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(balance)}
             </Text>
           )}
         </View>
-        <View style={{ position: "absolute", bottom: -10, right: -10, opacity: 0.07 } as any}>
-          <Feather name="circle" size={110} color="#fff" />
-        </View>
+
+        {/* Hidden overlay badge */}
+        {isHidden && (
+          <View style={cardS.hiddenBadge}>
+            <Feather name="eye-off" size={10} color="rgba(255,255,255,0.7)" />
+            <Text style={cardS.hiddenBadgeText}>Hidden</Text>
+          </View>
+        )}
       </LinearGradient>
-    </View>
+    </Animated.View>
   );
 }
 
-// ─── "Link Bank" add-card button ──────────────────────────────────────────────
-function AddBankCard({ onPress, loading }: { onPress: () => void; loading: boolean }) {
+// ─── "Link Another Bank" add card ─────────────────────────────────────────────
+
+function AddBankCard({
+  onPress,
+  loading,
+}: {
+  onPress: () => void;
+  loading: boolean;
+}) {
   return (
     <Pressable
       onPress={onPress}
@@ -167,7 +247,7 @@ function AddBankCard({ onPress, loading }: { onPress: () => void; loading: boole
       style={({ pressed }) => [cardS.addWrap, pressed && { opacity: 0.75 }]}
     >
       <LinearGradient
-        colors={["rgba(108,158,255,0.12)", "rgba(79,127,255,0.05)"]}
+        colors={["rgba(108,158,255,0.10)", "rgba(79,127,255,0.04)"]}
         style={cardS.addGrad}
       >
         {loading ? (
@@ -175,7 +255,7 @@ function AddBankCard({ onPress, loading }: { onPress: () => void; loading: boole
         ) : (
           <>
             <View style={cardS.addIcon}>
-              <Feather name="plus" size={22} color={Colors.primary} />
+              <Feather name="plus" size={20} color={Colors.primary} />
             </View>
             <Text style={cardS.addLabel}>Link Bank</Text>
             <Text style={cardS.addSub}>via Plaid</Text>
@@ -186,9 +266,112 @@ function AddBankCard({ onPress, loading }: { onPress: () => void; loading: boole
   );
 }
 
+// ─── Dot indicator ────────────────────────────────────────────────────────────
+
+function DotIndicator({
+  total,
+  active,
+}: {
+  total: number;
+  active: number;
+}) {
+  if (total <= 1) return null;
+  return (
+    <View style={dotS.row}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            dotS.dot,
+            i === active
+              ? dotS.dotActive
+              : dotS.dotInactive,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── Per-institution rolodex carousel ────────────────────────────────────────
+
+function InstitutionCarousel({
+  institutionName,
+  accounts,
+  hiddenIds,
+  onToggle,
+  onAddBank,
+  addLoading,
+  isLastGroup,
+}: {
+  institutionName: string;
+  accounts: PlaidLinkedAccount[];
+  hiddenIds: string[];
+  onToggle: (id: string) => void;
+  onAddBank: () => void;
+  addLoading: boolean;
+  isLastGroup: boolean;
+}) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const visibleCount = accounts.filter((a) => !hiddenIds.includes(a.accountId)).length;
+
+  return (
+    <View style={groupS.wrap}>
+      {/* Institution header */}
+      <View style={groupS.header}>
+        <View style={groupS.institutionIcon}>
+          <Feather name="home" size={13} color={Colors.primary} />
+        </View>
+        <Text style={groupS.name} numberOfLines={1}>
+          {institutionName}
+        </Text>
+        <View style={groupS.countBadge}>
+          <Text style={groupS.countText}>
+            {visibleCount}/{accounts.length} shown
+          </Text>
+        </View>
+      </View>
+
+      {/* Rolodex scroll */}
+      <ScrollView
+        horizontal
+        snapToInterval={SNAP_INTERVAL}
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={groupS.scrollContent}
+        onScroll={(e) => {
+          const idx = Math.round(
+            e.nativeEvent.contentOffset.x / SNAP_INTERVAL
+          );
+          setActiveIndex(Math.max(0, Math.min(idx, accounts.length - 1)));
+        }}
+        scrollEventThrottle={16}
+      >
+        {accounts.map((account) => (
+          <AccountCard
+            key={account.accountId}
+            account={account}
+            isHidden={hiddenIds.includes(account.accountId)}
+            onToggleVisibility={() => onToggle(account.accountId)}
+          />
+        ))}
+        {/* "Link Another Bank" only appears after the last group */}
+        {isLastGroup && (
+          <AddBankCard onPress={onAddBank} loading={addLoading} />
+        )}
+      </ScrollView>
+
+      {/* Position indicator */}
+      <DotIndicator total={accounts.length} active={activeIndex} />
+    </View>
+  );
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
+
 export function PlaidLinkedCards() {
-  const { plaidAccounts, addPlaidAccounts } = useFinance();
+  const { plaidAccounts, hiddenPlaidAccountIds, addPlaidAccounts, togglePlaidAccountVisibility } =
+    useFinance();
   const { token, isAuthenticated } = useAuth();
   const [loginVisible, setLoginVisible] = useState(false);
   const [linkLoading, setLinkLoading] = useState(false);
@@ -199,7 +382,10 @@ export function PlaidLinkedCards() {
     try {
       const res = await fetch(apiUrl("/api/plaid/link-token"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!res.ok) {
         const err = (await res.json()) as { error?: string };
@@ -208,7 +394,10 @@ export function PlaidLinkedCards() {
       }
       return ((await res.json()) as { link_token: string }).link_token;
     } catch {
-      Alert.alert("Network Error", "Could not reach the API server.\nCheck EXPO_PUBLIC_API_BASE_URL.");
+      Alert.alert(
+        "Network Error",
+        "Could not reach the API server.\nCheck EXPO_PUBLIC_API_BASE_URL."
+      );
       return null;
     }
   }, [token]);
@@ -219,8 +408,14 @@ export function PlaidLinkedCards() {
       try {
         const res = await fetch(apiUrl("/api/plaid/exchange"), {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ public_token: publicToken, institution_name: institutionName }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            public_token: publicToken,
+            institution_name: institutionName,
+          }),
         });
         if (!res.ok) {
           const err = (await res.json()) as { error?: string };
@@ -232,19 +427,25 @@ export function PlaidLinkedCards() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
           "Bank Linked!",
-          `${data.accounts.length} account${data.accounts.length !== 1 ? "s" : ""} added from ${institutionName}.`,
+          `${data.accounts.length} account${data.accounts.length !== 1 ? "s" : ""} added from ${institutionName}.`
         );
       } catch {
         Alert.alert("Error", "Failed to link bank account.");
       }
     },
-    [token, addPlaidAccounts],
+    [token, addPlaidAccounts]
   );
 
   const handleAddBankPress = useCallback(async () => {
-    if (!isAuthenticated) { setLoginVisible(true); return; }
+    if (!isAuthenticated) {
+      setLoginVisible(true);
+      return;
+    }
     if (Platform.OS !== "web") {
-      Alert.alert("Web Only", "Plaid bank linking is available in the web version of this app.");
+      Alert.alert(
+        "Web Only",
+        "Plaid bank linking is available in the web version of this app."
+      );
       return;
     }
     setLinkLoading(true);
@@ -256,22 +457,41 @@ export function PlaidLinkedCards() {
   const onPlaidSuccess = useCallback<PlaidLinkOnSuccess>(
     (public_token, metadata) => {
       setPlaidLinkToken(null);
-      void exchangeToken(public_token, metadata.institution?.name ?? "Linked Bank");
+      void exchangeToken(
+        public_token,
+        metadata.institution?.name ?? "Linked Bank"
+      );
     },
-    [exchangeToken],
+    [exchangeToken]
   );
 
-  // On native or when there are no accounts to show, render nothing
+  // Group accounts by institution
+  const institutionGroups = React.useMemo(() => {
+    const map = new Map<string, PlaidLinkedAccount[]>();
+    for (const account of plaidAccounts) {
+      const key = account.institutionName;
+      const existing = map.get(key) ?? [];
+      map.set(key, [...existing, account]);
+    }
+    return Array.from(map.entries()).map(([name, accounts]) => ({ name, accounts }));
+  }, [plaidAccounts]);
+
+  // On native with no accounts, render nothing
   if (Platform.OS !== "web" && plaidAccounts.length === 0) return null;
+
+  const totalVisible = plaidAccounts.filter(
+    (a) => !hiddenPlaidAccountIds.includes(a.accountId)
+  ).length;
 
   return (
     <View style={s.container}>
+      {/* Section header */}
       <View style={s.headerRow}>
         <View>
           <Text style={s.sectionTitle}>Linked Banks</Text>
           <Text style={s.sectionSub}>
             {plaidAccounts.length > 0
-              ? `${plaidAccounts.length} account${plaidAccounts.length !== 1 ? "s" : ""} via Plaid`
+              ? `${totalVisible} of ${plaidAccounts.length} account${plaidAccounts.length !== 1 ? "s" : ""} visible`
               : "Securely link your bank via Plaid"}
           </Text>
         </View>
@@ -283,14 +503,34 @@ export function PlaidLinkedCards() {
         )}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.scroll}>
-        {plaidAccounts.map((a) => <AccountCard key={a.accountId} account={a} />)}
-        {Platform.OS === "web" && (
-          <AddBankCard onPress={handleAddBankPress} loading={linkLoading} />
-        )}
-      </ScrollView>
+      {/* Institution carousels */}
+      {institutionGroups.length > 0 ? (
+        institutionGroups.map((group, idx) => (
+          <InstitutionCarousel
+            key={group.name}
+            institutionName={group.name}
+            accounts={group.accounts}
+            hiddenIds={hiddenPlaidAccountIds}
+            onToggle={togglePlaidAccountVisibility}
+            onAddBank={handleAddBankPress}
+            addLoading={linkLoading}
+            isLastGroup={idx === institutionGroups.length - 1}
+          />
+        ))
+      ) : (
+        /* No banks linked yet — show the add card */
+        Platform.OS === "web" && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}
+          >
+            <AddBankCard onPress={handleAddBankPress} loading={linkLoading} />
+          </ScrollView>
+        )
+      )}
 
-      {/* PlaidLinkOpener is only mounted on web and only when we have a link token */}
+      {/* Plaid Link opener */}
       {Platform.OS === "web" && plaidLinkToken && (
         <PlaidLinkOpener
           token={plaidLinkToken}
@@ -299,7 +539,10 @@ export function PlaidLinkedCards() {
         />
       )}
 
-      <LoginModal visible={loginVisible} onClose={() => setLoginVisible(false)} />
+      <LoginModal
+        visible={loginVisible}
+        onClose={() => setLoginVisible(false)}
+      />
     </View>
   );
 }
@@ -313,91 +556,340 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 17, color: Colors.textPrimary, marginBottom: 2 },
-  sectionSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  sectionSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
   badge: {
-    flexDirection: "row", alignItems: "center", gap: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     backgroundColor: "rgba(74,222,170,0.12)",
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
-    borderWidth: 1, borderColor: "rgba(74,222,170,0.2)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(74,222,170,0.2)",
   },
-  badgeText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.positive },
-  scroll: { paddingLeft: 20, paddingRight: 8, gap: 12, alignItems: "flex-start" },
+  badgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.positive,
+  },
+});
+
+const groupS = StyleSheet.create({
+  wrap: { marginTop: 14 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  institutionIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: "rgba(108,158,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  name: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  countBadge: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  countText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  scrollContent: {
+    paddingLeft: 20,
+    paddingRight: 12,
+    gap: CARD_GAP,
+    alignItems: "flex-start",
+  },
 });
 
 const cardS = StyleSheet.create({
   wrap: {
-    width: 210, height: 138, borderRadius: 18, overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 10,
   },
-  grad: { flex: 1, padding: 16, justifyContent: "space-between" },
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  grad: {
+    flex: 1,
+    padding: 14,
+  },
+  decorCircle: {
+    position: "absolute",
+    bottom: -18,
+    right: -18,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   iconBg: {
-    width: 30, height: 30, borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center",
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   typeBadge: {
-    backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3,
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: "flex-start",
   },
   typeBadgeText: {
-    fontFamily: "Inter_600SemiBold", fontSize: 10, color: "rgba(255,255,255,0.9)",
-    textTransform: "uppercase", letterSpacing: 0.5,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: "rgba(255,255,255,0.9)",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  institution: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "rgba(255,255,255,0.95)", marginTop: 2 },
-  name: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.65)" },
-  bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  mask: { fontFamily: "Inter_500Medium", fontSize: 13, color: "rgba(255,255,255,0.8)", letterSpacing: 1 },
-  balance: { fontFamily: "Inter_700Bold", fontSize: 13, color: "#fff" },
+  eyeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mid: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: 4,
+  },
+  institution: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.95)",
+  },
+  name: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 1,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  mask: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.8)",
+    letterSpacing: 1,
+  },
+  balance: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: "#fff",
+  },
+  hiddenBadge: {
+    position: "absolute",
+    top: 10,
+    left: "50%" as any,
+    transform: [{ translateX: -28 }],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  hiddenBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.7)",
+  },
   addWrap: {
-    width: 128, height: 138, borderRadius: 18, overflow: "hidden",
-    borderWidth: 1.5, borderColor: "rgba(108,158,255,0.28)",
+    width: 118,
+    height: CARD_HEIGHT,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: "rgba(108,158,255,0.28)",
     borderStyle: "dashed",
   },
-  addGrad: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3 },
-  addIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: "rgba(108,158,255,0.15)", alignItems: "center", justifyContent: "center", marginBottom: 4,
+  addGrad: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
   },
-  addLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.primary },
-  addSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
+  addIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "rgba(108,158,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  addLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  addSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+});
+
+const dotS = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  dotActive: {
+    backgroundColor: Colors.primary,
+    width: 14,
+    borderRadius: 3,
+  },
+  dotInactive: {
+    backgroundColor: Colors.divider,
+  },
 });
 
 const loginS = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "flex-end",
+  },
   sheet: {
-    backgroundColor: "#1C1048", borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40,
+    backgroundColor: "#1C1048",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
   handle: {
-    width: 36, height: 4, backgroundColor: Colors.divider, borderRadius: 2,
-    alignSelf: "center", marginBottom: 16,
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.divider,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
   },
   header: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-  title: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.textPrimary },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.textPrimary,
+  },
   closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   badge: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(74,222,170,0.1)", borderRadius: 10, padding: 10,
-    borderWidth: 1, borderColor: "rgba(74,222,170,0.2)", marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(74,222,170,0.1)",
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(74,222,170,0.2)",
+    marginBottom: 20,
   },
-  badgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.positive },
+  badgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.positive,
+  },
   label: {
-    fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textMuted,
-    textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8, marginTop: 4,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 4,
   },
   input: {
-    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textPrimary,
-    backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 12, padding: 14,
-    borderWidth: 1, borderColor: Colors.divider, marginBottom: 12,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: Colors.textPrimary,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 12,
   },
-  btn: { backgroundColor: Colors.primaryDark, borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 8 },
-  btnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+  btn: {
+    backgroundColor: Colors.primaryDark,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  btnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#fff",
+  },
 });

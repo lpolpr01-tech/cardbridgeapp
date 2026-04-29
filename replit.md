@@ -29,7 +29,10 @@
 - Plaid: Sandbox mode. Frontend `PlaidLinkedCards` component fetches a link token, opens Plaid Link (web-only via `react-plaid-link`), exchanges the public token server-side. Linked accounts stored in `FinanceContext.plaidAccounts`.
 - Stripe: ACH payments via Plaid processor tokens. No raw card/bank numbers ever stored.
 - Beta test credentials: email `beta@finapp.com`, password `BetaTest2025!` (changeable via env vars BETA_USER_EMAIL / BETA_USER_PASSWORD)
-- Required env vars: JWT_SECRET, PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV, STRIPE_SECRET_KEY, EXPO_PUBLIC_API_BASE_URL — see `.env.example`
+- Required env vars: JWT_SECRET, PLAID_CLIENT_ID, PLAID_SANDBOX_SECRET (or PLAID_SECRET), PLAID_ENV, STRIPE_SECRET_KEY, EXPO_PUBLIC_API_BASE_URL — see `.env.example`
+- Plaid client checks `PLAID_SANDBOX_SECRET` first, then falls back to `PLAID_SECRET`
+- PlaidLinkedCards: rolodex-style horizontal carousel grouped by institution; per-card visibility toggle (eye icon) persisted via AsyncStorage in `hiddenPlaidAccountIds`; dot-indicator per bank group; supports multiple banks
+- FinanceContext: `hiddenPlaidAccountIds: string[]` + `togglePlaidAccountVisibility(id)` added
 
 ## Sandbox → Production Migration Guide
 

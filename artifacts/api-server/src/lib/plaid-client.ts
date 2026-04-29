@@ -9,7 +9,8 @@ let _client: PlaidApi | null = null;
 
 export function getPlaidClient(): PlaidApi | null {
   const clientId = process.env["PLAID_CLIENT_ID"];
-  const secret = process.env["PLAID_SECRET"];
+  const secret =
+    process.env["PLAID_SANDBOX_SECRET"] ?? process.env["PLAID_SECRET"];
   if (!clientId || !secret) return null;
 
   if (!_client) {

@@ -81,12 +81,14 @@ type FinanceContextType = {
   scheduledPayments: ScheduledPayment[];
   bankAccounts: BankAccount[];
   plaidAccounts: PlaidLinkedAccount[];
+  hiddenPlaidAccountIds: string[];
   pendingPayment: PendingPayment | null;
   totalBalance: number;
   addScheduledPayment: (payment: Omit<ScheduledPayment, "id" | "status">) => void;
   cancelScheduledPayment: (id: string) => void;
   addBankAccount: (bank: Omit<BankAccount, "id">) => void;
   addPlaidAccounts: (accounts: PlaidLinkedAccount[]) => void;
+  togglePlaidAccountVisibility: (accountId: string) => void;
   setPendingPayment: (p: PendingPayment | null) => void;
 };
 
@@ -377,13 +379,24 @@ const INITIAL_BANKS: BankAccount[] = [
   },
 ];
 
+const HIDDEN_PLAID_KEY = "@finapp_hidden_plaid_accounts";
+
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [cards] = useState<Card[]>(INITIAL_CARDS);
   const [transactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [scheduledPayments, setScheduledPayments] = useState<ScheduledPayment[]>(INITIAL_SCHEDULED);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANKS);
   const [plaidAccounts, setPlaidAccounts] = useState<PlaidLinkedAccount[]>([]);
+  const [hiddenPlaidAccountIds, setHiddenPlaidAccountIds] = useState<string[]>([]);
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(HIDDEN_PLAID_KEY).then((val) => {
+      if (val) {
+        try { setHiddenPlaidAccountIds(JSON.parse(val) as string[]); } catch { /* ignore */ }
+      }
+    });
+  }, []);
 
   const totalBalance = cards.reduce((sum, c) => sum + c.balance, 0);
 
@@ -419,6 +432,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const togglePlaidAccountVisibility = useCallback((accountId: string) => {
+    setHiddenPlaidAccountIds((prev) => {
+      const next = prev.includes(accountId)
+        ? prev.filter((id) => id !== accountId)
+        : [...prev, accountId];
+      AsyncStorage.setItem(HIDDEN_PLAID_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   return (
     <FinanceContext.Provider
       value={{
@@ -427,12 +450,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         scheduledPayments,
         bankAccounts,
         plaidAccounts,
+        hiddenPlaidAccountIds,
         pendingPayment,
         totalBalance,
         addScheduledPayment,
         cancelScheduledPayment,
         addBankAccount,
         addPlaidAccounts,
+        togglePlaidAccountVisibility,
         setPendingPayment,
       }}
     >
