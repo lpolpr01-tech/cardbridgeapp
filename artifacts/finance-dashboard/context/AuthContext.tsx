@@ -1,13 +1,38 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { apiUrl } from "@/constants/api";
 
-const AUTH_TOKEN_KEY = "@finapp_auth_token";
-const AUTH_USER_KEY = "@finapp_auth_user";
+// TODO: Replace with Replit Auth before going live
+const SESSION_KEY = "cardflow_beta_token";
+
+function readSession(): string | null {
+  try {
+    if (Platform.OS === "web" && typeof sessionStorage !== "undefined") {
+      return sessionStorage.getItem(SESSION_KEY);
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function writeSession(token: string) {
+  try {
+    if (Platform.OS === "web" && typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem(SESSION_KEY, token);
+    }
+  } catch { /* ignore */ }
+}
+
+function clearSession() {
+  try {
+    if (Platform.OS === "web" && typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  } catch { /* ignore */ }
+}
 
 export type AuthUser = {
   id: string;
-  email: string;
+  email: string | null;
   name: string;
 };
 
@@ -16,52 +41,45 @@ type AuthContextType = {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(AUTH_TOKEN_KEY),
-      AsyncStorage.getItem(AUTH_USER_KEY),
-    ]).then(([storedToken, storedUser]) => {
-      if (storedToken) setToken(storedToken);
-      if (storedUser) {
-        try { setUser(JSON.parse(storedUser)); } catch { /* ignore */ }
-      }
-      setIsLoading(false);
-    });
+    const stored = readSession();
+    if (stored) setToken(stored);
+    setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     const res = await fetch(apiUrl("/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
     if (!res.ok) {
-      const data = await res.json();
-      throw new Error((data as { error?: string }).error ?? "Login failed");
+      const data = (await res.json()) as { error?: string };
+      throw new Error(data.error ?? "Login failed");
     }
-    const data = (await res.json()) as { token: string; user: AuthUser };
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
+    const data = (await res.json()) as { token: string };
+    writeSession(data.token);
     setToken(data.token);
-    setUser(data.user);
   }, []);
 
-  const logout = useCallback(async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
+  const logout = useCallback(() => {
+    clearSession();
     setToken(null);
-    setUser(null);
   }, []);
+
+  const user: AuthUser | null = token
+    ? { id: "beta-luispol", email: null, name: "Beta User" }
+    : null;
 
   return (
     <AuthContext.Provider

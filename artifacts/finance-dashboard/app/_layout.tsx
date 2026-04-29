@@ -8,12 +8,13 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -21,7 +22,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { FinanceProvider } from "@/context/FinanceContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 
@@ -66,8 +67,29 @@ function RootLayoutNav() {
   );
 }
 
-function AuthGate({ children }: { children: React.ReactNode }) {
+// TODO: Replace with Replit Auth before going live
+function BetaLoginGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, login } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      setError("Please enter your username and password.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(username.trim(), password);
+    } catch (e: unknown) {
+      setError((e as Error).message ?? "Login failed. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -81,14 +103,63 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <View style={gateS.container}>
         <View style={gateS.card}>
+          <View style={gateS.betaBadge}>
+            <Text style={gateS.betaBadgeText}>BETA MODE</Text>
+          </View>
+
           <Text style={gateS.logo}>CardFlow</Text>
           <Text style={gateS.tagline}>Your finances, beautifully organised</Text>
+
           <View style={gateS.divider} />
+
+          <View style={gateS.fieldGroup}>
+            <Text style={gateS.label}>Username</Text>
+            <TextInput
+              style={gateS.input}
+              value={username}
+              onChangeText={(v) => { setUsername(v); setError(null); }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Username"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              returnKeyType="next"
+            />
+          </View>
+
+          <View style={gateS.fieldGroup}>
+            <Text style={gateS.label}>Password</Text>
+            <TextInput
+              style={gateS.input}
+              value={password}
+              onChangeText={(v) => { setPassword(v); setError(null); }}
+              secureTextEntry
+              placeholder="Password"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              returnKeyType="go"
+              onSubmitEditing={handleLogin}
+            />
+          </View>
+
+          {error && (
+            <View style={gateS.errorBox}>
+              <Text style={gateS.errorText}>{error}</Text>
+            </View>
+          )}
+
           <Pressable
-            onPress={login}
-            style={({ pressed }) => [gateS.btn, pressed && { opacity: 0.85 }]}
+            onPress={handleLogin}
+            disabled={submitting}
+            style={({ pressed }) => [
+              gateS.btn,
+              pressed && { opacity: 0.85 },
+              submitting && { opacity: 0.6 },
+            ]}
           >
-            <Text style={gateS.btnText}>Sign in to continue</Text>
+            {submitting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={gateS.btnText}>Sign in</Text>
+            )}
           </Pressable>
         </View>
       </View>
@@ -117,39 +188,89 @@ const gateS = StyleSheet.create({
     maxWidth: 360,
     backgroundColor: "#1C1048",
     borderRadius: 24,
-    padding: 32,
-    alignItems: "center",
+    padding: 28,
     borderWidth: 1,
     borderColor: "rgba(108,158,255,0.15)",
   },
+  betaBadge: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(251,146,60,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(251,146,60,0.35)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 16,
+  },
+  betaBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "#FB923C",
+    letterSpacing: 1.2,
+  },
   logo: {
     fontFamily: "Inter_700Bold",
-    fontSize: 32,
+    fontSize: 30,
     color: "#FFFFFF",
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   tagline: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.55)",
-    textAlign: "center",
-    lineHeight: 20,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.5)",
+    lineHeight: 18,
   },
   divider: {
-    width: 40,
+    width: 36,
     height: 2,
-    backgroundColor: "rgba(108,158,255,0.3)",
+    backgroundColor: "rgba(108,158,255,0.25)",
     borderRadius: 1,
-    marginVertical: 28,
+    marginVertical: 22,
+  },
+  fieldGroup: {
+    marginBottom: 14,
+  },
+  label: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+    textTransform: "uppercase",
+    letterSpacing: 0.9,
+    marginBottom: 6,
+  },
+  input: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: "#FFFFFF",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  errorBox: {
+    backgroundColor: "rgba(255,107,138,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,107,138,0.3)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  errorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "#FF6B8A",
+    lineHeight: 18,
   },
   btn: {
     backgroundColor: "#4F7FFF",
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
+    borderRadius: 13,
+    paddingVertical: 15,
     alignItems: "center",
-    width: "100%",
+    marginTop: 6,
   },
   btnText: {
     fontFamily: "Inter_600SemiBold",
@@ -181,13 +302,13 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <AuthProvider>
-                <AuthGate>
+                <BetaLoginGate>
                   <ThemeProvider>
                     <FinanceProvider>
                       <RootLayoutNav />
                     </FinanceProvider>
                   </ThemeProvider>
-                </AuthGate>
+                </BetaLoginGate>
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

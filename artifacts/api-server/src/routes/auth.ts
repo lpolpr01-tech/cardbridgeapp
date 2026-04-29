@@ -57,6 +57,31 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
+// TODO: Replace with Replit Auth before going live
+// Beta test credentials (sandbox only — hardcoded for temporary access)
+const BETA_USERNAME = "luispol";
+const BETA_PASSWORD = "12345";
+
+router.post("/auth/login", async (req: Request, res: Response) => {
+  const { username, password } = req.body as { username?: string; password?: string };
+  if (!username || !password || username !== BETA_USERNAME || password !== BETA_PASSWORD) {
+    res.status(401).json({ error: "Incorrect username or password." });
+    return;
+  }
+  const sessionData: SessionData = {
+    user: {
+      id: "beta-luispol",
+      email: null,
+      firstName: "Beta",
+      lastName: "User",
+      profileImageUrl: null,
+    },
+    access_token: "beta",
+  };
+  const sid = await createSession(sessionData);
+  res.json({ token: sid });
+});
+
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
     id: claims.sub as string,

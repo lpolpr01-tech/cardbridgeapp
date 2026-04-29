@@ -16,7 +16,7 @@
 
 ## Backend API (artifacts/api-server/)
 - `src/routes/credit.ts` — Credit intelligence REST API (mock data): GET /api/credit/{profile,score,health,debt,utilization,payment-history,factors,recommendations}
-- `src/routes/auth.ts` — Replit Auth OIDC: GET /api/login, GET /api/callback, GET /api/logout, GET /api/auth/user, POST /api/mobile-auth/token-exchange, POST /api/mobile-auth/logout
+- `src/routes/auth.ts` — Beta login: POST /api/auth/login (hardcoded luispol/12345 → session token); plus Replit Auth OIDC routes kept for future use: GET /api/login, GET /api/callback, GET /api/logout, GET /api/auth/user
 - `src/routes/plaid.ts` — Plaid: POST /api/plaid/link-token, POST /api/plaid/exchange, GET /api/plaid/accounts, POST /api/plaid/processor-token (all require auth via `requireAuth`)
 - `src/routes/stripe.ts` — Stripe: POST /api/stripe/charge, POST /api/stripe/payment-intent (all require auth via `requireAuth`)
 - `src/lib/auth.ts` — OIDC config, session CRUD (PostgreSQL), cookie helpers
@@ -27,8 +27,8 @@
 - `src/lib/stripe-client.ts` — Stripe Node.js SDK client factory
 
 ## Auth / Plaid / Stripe Integration
-- Auth: Replit Auth (OpenID Connect with PKCE). Sessions stored in PostgreSQL (`sessions` table). User profiles in `users` table. Mobile app uses `expo-auth-session` → sends auth code to `POST /api/mobile-auth/token-exchange` → session token stored in `expo-secure-store`. Auth gate in `_layout.tsx` blocks all app screens until authenticated. All data is user-scoped via `req.user.id`.
-- Auth files: `src/lib/auth.ts` (OIDC config, session CRUD), `src/middlewares/authMiddleware.ts` (session loader), `src/routes/auth.ts` (OIDC routes + mobile token exchange), `lib/auth.tsx` (mobile auth provider + hook)
+- Auth: Beta mode — hardcoded credentials (luispol/12345). `POST /api/auth/login` creates a PostgreSQL-backed session and returns a token. Frontend stores the token in `sessionStorage` (clears on tab close). `BetaLoginGate` in `_layout.tsx` blocks all screens until authenticated. TODO: Replace with Replit Auth before going live.
+- Auth files: `context/AuthContext.tsx` (beta session context), `src/routes/auth.ts` (beta login route + OIDC routes for future use), `src/lib/auth.ts` (session CRUD, PostgreSQL), `src/middlewares/authMiddleware.ts` (session loader for Bearer tokens)
 - Plaid: Sandbox mode. Frontend `PlaidLinkedCards` component fetches a link token, opens Plaid Link (web-only via `react-plaid-link`), exchanges the public token server-side. Linked accounts stored in `FinanceContext.plaidAccounts`.
 - Stripe: ACH payments via Plaid processor tokens. No raw card/bank numbers ever stored.
 - Required env vars: PLAID_CLIENT_ID, PLAID_SANDBOX_SECRET (or PLAID_SECRET), PLAID_ENV, STRIPE_SECRET_KEY, EXPO_PUBLIC_API_BASE_URL — see `.env.example`
@@ -38,10 +38,11 @@
 
 ## Sandbox → Production Migration Guide
 
-### 1. Auth is already production-ready
-- Replit Auth (OIDC) is used — no custom user management needed
-- Sessions are stored in PostgreSQL (`sessions` table); user profiles in the `users` table
-- To switch to a different identity provider, update `ISSUER_URL` in `src/lib/auth.ts`
+### 1. Replace beta login with Replit Auth
+- Remove the `BETA_USERNAME`/`BETA_PASSWORD` constants and `POST /api/auth/login` route from `src/routes/auth.ts`
+- The OIDC routes (GET /api/login, GET /api/callback, etc.) are already in place — just wire them up
+- Update `context/AuthContext.tsx` to use `expo-auth-session` (PKCE flow) instead of sessionStorage
+- Sessions and the `users` table are already in PostgreSQL — no schema changes needed
 
 ### 2. Plaid: switch from sandbox to production
 - In Plaid dashboard: apply for development/production access

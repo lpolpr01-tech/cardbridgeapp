@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import * as SecureStore from "expo-secure-store";
 import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,7 +17,7 @@ import {
 } from "react-native";
 import Colors from "@/constants/colors";
 import { apiUrl } from "@/constants/api";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/context/AuthContext";
 import { useFinance, type PlaidLinkedAccount } from "@/context/FinanceContext";
 
 const CARD_WIDTH = 230;
@@ -294,19 +293,18 @@ function InstitutionCarousel({
 export function PlaidLinkedCards() {
   const { plaidAccounts, hiddenPlaidAccountIds, addPlaidAccounts, togglePlaidAccountVisibility } =
     useFinance();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const [linkLoading, setLinkLoading] = useState(false);
   const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
 
   const fetchLinkToken = useCallback(async (): Promise<string | null> => {
     if (!isAuthenticated) return null;
     try {
-      const authToken = await SecureStore.getItemAsync("auth_session_token");
       const res = await fetch(apiUrl("/api/plaid/link-token"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
       if (!res.ok) {
@@ -328,12 +326,11 @@ export function PlaidLinkedCards() {
     async (publicToken: string, institutionName: string) => {
       if (!isAuthenticated) return;
       try {
-        const authToken = await SecureStore.getItemAsync("auth_session_token");
         const res = await fetch(apiUrl("/api/plaid/exchange"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             public_token: publicToken,
@@ -356,7 +353,7 @@ export function PlaidLinkedCards() {
         Alert.alert("Error", "Failed to link bank account.");
       }
     },
-    [isAuthenticated, addPlaidAccounts]
+    [isAuthenticated, token, addPlaidAccounts]
   );
 
   const handleAddBankPress = useCallback(async () => {
