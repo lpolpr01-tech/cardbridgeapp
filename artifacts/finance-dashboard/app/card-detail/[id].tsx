@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Linking,
@@ -18,8 +19,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useFinance } from "@/context/FinanceContext";
-import type { CardRewards } from "@/context/FinanceContext";
+import type { CardRewards, Transaction } from "@/context/FinanceContext";
 import { SUBSCRIPTIONS, CARD_COLORS } from "@/constants/subscriptions";
+import { apiUrl } from "@/constants/api";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Merchant logo / emoji helpers ────────────────────────────────────────────
 
@@ -547,10 +550,52 @@ function DonutChart({ slices, size = 170 }: { slices: CatSlice[]; size?: number 
 
 const TX_PENDING_CUTOFF = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+type RemoteTx = {
+  id: string;
+  accountId: string;
+  title: string;
+  category: string;
+  amount: number;
+  date: string;
+  type: "debit" | "credit";
+  pending: boolean;
+};
+
 function TransactionsPanel({ cardId }: { cardId: string }) {
   const { transactions } = useFinance();
-  const cardTxs = transactions.filter((t) => t.cardId === cardId);
+  const { token: authToken } = useAuth();
+  const localTxs = transactions.filter((t) => t.cardId === cardId);
+  const [remoteTxs, setRemoteTxs] = useState<RemoteTx[]>([]);
+  const [loadingRemote, setLoadingRemote] = useState(true);
   const [txStatus, setTxStatus] = useState<"pending" | "posted">("posted");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingRemote(true);
+      try {
+        const res = await fetch(apiUrl("/api/plaid/transactions"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({ account_id: cardId, days: 30 }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { transactions: RemoteTx[] };
+          if (!cancelled) setRemoteTxs(data.transactions ?? []);
+        }
+      } catch {
+        // Network error or backend unreachable — fall back to local mock data only
+      } finally {
+        if (!cancelled) setLoadingRemote(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId, authToken]);
 
   const swipeRef = useRef(
     PanResponder.create({
@@ -564,10 +609,31 @@ function TransactionsPanel({ cardId }: { cardId: string }) {
     })
   ).current;
 
-  const slices = buildCategoryData(cardTxs);
+  // Merge: real Plaid transactions take precedence; fall back to local mocks if none.
+  type Combined = Pick<Transaction, "id" | "title" | "category" | "amount" | "date" | "type"> & {
+    pending?: boolean;
+  };
+  const combined: Combined[] =
+    remoteTxs.length > 0
+      ? remoteTxs.map((t) => ({
+          id: t.id,
+          title: t.title,
+          category: t.category,
+          amount: t.amount,
+          date: t.date,
+          type: t.type,
+          pending: t.pending,
+        }))
+      : localTxs;
 
-  const shown = cardTxs
+  const slices = buildCategoryData(combined);
+
+  const shown = combined
     .filter((t) => {
+      // Prefer the explicit pending flag from Plaid, else fall back to recency
+      if ("pending" in t && typeof t.pending === "boolean") {
+        return txStatus === "pending" ? t.pending : !t.pending;
+      }
       const d = new Date(t.date);
       return txStatus === "pending" ? d >= TX_PENDING_CUTOFF : d < TX_PENDING_CUTOFF;
     })
@@ -733,9 +799,30 @@ function CardInfoScroll({ rewards, cardId, balance }: { rewards: CardRewards; ca
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { cards, transactions } = useFinance();
+  const { cards, transactions, plaidAccounts } = useFinance();
 
-  const card = cards.find((c) => c.id === id);
+  const localCard = cards.find((c) => c.id === id);
+  const plaidAccount = plaidAccounts.find((a) => a.accountId === id);
+
+  // Build a unified card object so the UI works for both local mock cards and Plaid-linked accounts
+  const card = localCard ?? (plaidAccount
+    ? {
+        id: plaidAccount.accountId,
+        name: plaidAccount.name,
+        lastFour: plaidAccount.mask ?? "----",
+        balance: plaidAccount.balanceCurrent ?? 0,
+        color: ["#1E5FAD", "#3E8EDD"] as [string, string],
+        type: "visa" as const,
+        limit: plaidAccount.balanceLimit ?? Math.max(plaidAccount.balanceCurrent ?? 0, 1),
+        rewards: {
+          type: "cashback" as const,
+          cashbackRate: 1.5,
+          cashbackTotal: 0,
+          description: `Linked ${plaidAccount.institutionName} account`,
+        },
+      }
+    : null);
+
   const cardTransactions = transactions.filter((t) => t.cardId === id);
   const totalSpent = cardTransactions.filter((t) => t.type === "debit").reduce((s, t) => s + Math.abs(t.amount), 0);
   const totalIncome = cardTransactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);

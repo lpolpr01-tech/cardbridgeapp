@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Pressable,
   ScrollView,
@@ -13,6 +14,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { apiUrl } from "@/constants/api";
+import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 
 function formatCurrency(n: number) {
@@ -97,8 +100,10 @@ function ScrambleRow({ label, value, delay, color, isTotal, onReveal }: Scramble
 export default function ReviewScreen() {
   const { bankAccountId } = useLocalSearchParams<{ bankAccountId: string }>();
   const { pendingPayment, bankAccounts, cards, addScheduledPayment, setPendingPayment } = useFinance();
+  const { token: authToken } = useAuth();
   const insets = useSafeAreaInsets();
   const [revealedCount, setRevealedCount] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const btnScale = useRef(new Animated.Value(1)).current;
 
   const bank = bankAccounts.find((b) => b.id === bankAccountId);
@@ -129,14 +134,88 @@ export default function ReviewScreen() {
     }
   }, [allRevealed]);
 
-  const handleConfirm = () => {
-    if (!allRevealed) return;
-    if (pendingPayment) {
-      addScheduledPayment({ ...pendingPayment });
-      setPendingPayment(null);
+  const handleConfirm = async () => {
+    if (!allRevealed || submitting) return;
+    if (!pendingPayment) return;
+
+    setSubmitting(true);
+
+    // Submit to backend: POST /api/stripe/schedule-payment.
+    // Backend expects a Plaid-linked depository account_id. Try to resolve one;
+    // if none, fall back to local-only scheduling so the demo still works.
+    let confNum = `PAY-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    let backendOk = false;
+
+    try {
+      // Resolve a Plaid-linked depository account to fund the scheduled payment
+      let plaidAccountId: string | null = null;
+      try {
+        const accountsRes = await fetch(apiUrl("/api/plaid/accounts"), {
+          method: "GET",
+          headers: { ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+        });
+        if (accountsRes.ok) {
+          const data = (await accountsRes.json()) as {
+            accounts: { accountId: string; type: string; subtype: string | null }[];
+          };
+          const dep = data.accounts?.find(
+            (a) => a.type === "depository" || a.subtype === "checking" || a.subtype === "savings",
+          );
+          plaidAccountId = dep?.accountId ?? null;
+        }
+      } catch {}
+
+      if (plaidAccountId) {
+        const res = await fetch(apiUrl("/api/stripe/schedule-payment"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({
+            account_id: plaidAccountId,
+            amounts: pendingPayment.amounts,
+            date: pendingPayment.date,
+            note: pendingPayment.note,
+          }),
+        });
+        const data = (await res.json()) as {
+          success?: boolean;
+          confirmation_number?: string;
+          error?: string;
+          details?: string;
+        };
+        if (!res.ok || !data.success) {
+          const errMsg = data.details ?? data.error ?? "Server rejected the request.";
+          setSubmitting(false);
+          router.push({ pathname: "/payment/error", params: { message: errMsg } });
+          return;
+        }
+        backendOk = true;
+        if (data.confirmation_number) confNum = data.confirmation_number;
+      } else {
+        // No Plaid bank linked — confirm local-only with the user before continuing
+        await new Promise<void>((resolve) =>
+          Alert.alert(
+            "No bank linked to backend",
+            "This payment will be saved locally only. Link a bank in Settings to enable real ACH scheduling.",
+            [{ text: "Continue", onPress: () => resolve() }],
+          ),
+        );
+      }
+    } catch {
+      setSubmitting(false);
+      router.push({
+        pathname: "/payment/error",
+        params: { message: "Network connection lost. Could not reach the payment server." },
+      });
+      return;
     }
+
+    addScheduledPayment({ ...pendingPayment });
+    setPendingPayment(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const confNum = `PAY-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    setSubmitting(false);
     router.replace({ pathname: "/payment/confirm", params: { confirmationNumber: confNum } });
   };
 
@@ -218,6 +297,41 @@ export default function ReviewScreen() {
           <ScrambleRow label="Total Amount Due" value={grandTotal} delay={1900} isTotal onReveal={onReveal} />
         </View>
 
+        {/* ACH settlement timeline disclosure */}
+        <View style={feeS.disclosureCard}>
+          <View style={feeS.disclosureHeader}>
+            <Feather name="info" size={14} color={Colors.primary} />
+            <Text style={feeS.disclosureTitle}>Settlement Timeline</Text>
+          </View>
+          <View style={feeS.timelineRow}>
+            <View style={feeS.timelineDot} />
+            <View style={feeS.timelineInfo}>
+              <Text style={feeS.timelineLabel}>Today</Text>
+              <Text style={feeS.timelineText}>Authorization & ACH debit initiated</Text>
+            </View>
+          </View>
+          <View style={feeS.timelineConnector} />
+          <View style={feeS.timelineRow}>
+            <View style={[feeS.timelineDot, { backgroundColor: "#F59E0B" }]} />
+            <View style={feeS.timelineInfo}>
+              <Text style={feeS.timelineLabel}>1–3 business days</Text>
+              <Text style={feeS.timelineText}>Funds clear and transfer to card issuer</Text>
+            </View>
+          </View>
+          <View style={feeS.timelineConnector} />
+          <View style={feeS.timelineRow}>
+            <View style={[feeS.timelineDot, { backgroundColor: Colors.positive }]} />
+            <View style={feeS.timelineInfo}>
+              <Text style={feeS.timelineLabel}>Settlement complete</Text>
+              <Text style={feeS.timelineText}>Card balance reduced by paid amount</Text>
+            </View>
+          </View>
+          <Text style={feeS.disclosureFootnote}>
+            Per Reg E, you may dispute any unauthorized ACH debit within 60 days of your statement.
+            Tap "Report a Problem" in Settings to start a dispute.
+          </Text>
+        </View>
+
         {!allRevealed && (
           <View style={styles.loadingHint}>
             <Feather name="loader" size={14} color={Colors.textMuted} />
@@ -260,6 +374,69 @@ export default function ReviewScreen() {
     </LinearGradient>
   );
 }
+
+const feeS = StyleSheet.create({
+  disclosureCard: {
+    backgroundColor: "rgba(108,158,255,0.06)",
+    borderColor: "rgba(108,158,255,0.18)",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 14,
+    marginHorizontal: 20,
+  },
+  disclosureHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  disclosureTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  timelineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.primary,
+  },
+  timelineInfo: { flex: 1 },
+  timelineLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textPrimary,
+  },
+  timelineText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  timelineConnector: {
+    width: 1,
+    height: 12,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginLeft: 4,
+  },
+  disclosureFootnote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 16,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+});
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },

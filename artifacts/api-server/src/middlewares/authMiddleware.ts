@@ -7,6 +7,7 @@ import {
   getSessionId,
   getSession,
   updateSession,
+  verifyBetaToken,
   type SessionData,
 } from "../lib/auth";
 
@@ -64,6 +65,14 @@ export async function authMiddleware(
 
   const sid = getSessionId(req);
   if (!sid) {
+    next();
+    return;
+  }
+
+  // JWT auth — works without a database (sandbox / local dev)
+  const jwtUser = verifyBetaToken(sid);
+  if (jwtUser) {
+    req.user = jwtUser;
     next();
     return;
   }

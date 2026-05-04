@@ -2,12 +2,16 @@ import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   Animated,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -126,6 +130,11 @@ function AiAgentModal({ visible, onClose }: { visible: boolean; onClose: () => v
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={aim.overlay}>
         <View style={[aim.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={aim.handle} />
@@ -226,6 +235,7 @@ function AiAgentModal({ visible, onClose }: { visible: boolean; onClose: () => v
           <Text style={aim.disclaimer}>CardFlow AI provides general financial guidance only. Not a licensed financial advisor.</Text>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

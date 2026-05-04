@@ -2,12 +2,16 @@ import React, { useCallback, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -410,6 +414,11 @@ function ThemeModal({ visible, onClose }: { visible: boolean; onClose: () => voi
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={tm.overlay}>
         <View style={[tm.sheet, { paddingBottom: insets.bottom + 20 }]}>
           <View style={tm.handle} />
@@ -434,7 +443,12 @@ function ThemeModal({ visible, onClose }: { visible: boolean; onClose: () => voi
             ))}
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ marginTop: 4 }}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
 
             {/* ── PASTEL TAB ── */}
             {activeTab === "pastel" && (
@@ -636,6 +650,7 @@ function ThemeModal({ visible, onClose }: { visible: boolean; onClose: () => voi
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -41,3 +41,28 @@ export function getPlaidAccessToken(userId: string, accountId: string): string |
   }
   return null;
 }
+
+// ─── Scheduled payments (in-memory; replace with DB for production) ──────────
+
+export type ScheduledPaymentRecord = {
+  id: string;
+  userId: string;
+  accountId: string;
+  amounts: Record<string, number>;
+  totalAmount: number;
+  date: string;
+  note: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  createdAt: string;
+};
+
+const scheduledPaymentStore = new Map<string, ScheduledPaymentRecord[]>();
+
+export function addScheduledPaymentRecord(userId: string, record: ScheduledPaymentRecord): void {
+  const existing = scheduledPaymentStore.get(userId) ?? [];
+  scheduledPaymentStore.set(userId, [...existing, record]);
+}
+
+export function getScheduledPaymentRecords(userId: string): ScheduledPaymentRecord[] {
+  return scheduledPaymentStore.get(userId) ?? [];
+}

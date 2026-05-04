@@ -1,11 +1,15 @@
 import React, { useState, useMemo } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
@@ -267,6 +271,11 @@ export function BudgetingScreen({ visible, onClose }: { visible: boolean; onClos
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={s.overlay}>
         <View style={[s.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={s.handle} />
@@ -297,7 +306,12 @@ export function BudgetingScreen({ visible, onClose }: { visible: boolean; onClos
           </ScrollView>
 
           {/* Body */}
-          <ScrollView showsVerticalScrollIndicator={false} style={s.body} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={s.body}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
 
             {/* ── OVERVIEW ── */}
             {tab === "overview" && (
@@ -687,6 +701,7 @@ export function BudgetingScreen({ visible, onClose }: { visible: boolean; onClos
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

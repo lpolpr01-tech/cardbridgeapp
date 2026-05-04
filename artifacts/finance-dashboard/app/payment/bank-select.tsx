@@ -5,12 +5,16 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -60,6 +64,11 @@ function AddBankModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={addBank.overlay}>
         <View style={[addBank.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={addBank.handle} />
@@ -69,7 +78,11 @@ function AddBankModal({
               <Feather name="x" size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
             <View style={addBank.achBadge}>
               <Feather name="shield" size={14} color={Colors.positive} />
               <Text style={addBank.achText}>ACH Secure Transfer · 256-bit encryption</Text>
@@ -110,6 +123,7 @@ function AddBankModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

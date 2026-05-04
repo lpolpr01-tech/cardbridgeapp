@@ -13,6 +13,7 @@ import {
   getSessionId,
   createSession,
   deleteSession,
+  signBetaToken,
   SESSION_COOKIE,
   SESSION_TTL,
   ISSUER_URL,
@@ -68,18 +69,18 @@ router.post("/auth/login", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Incorrect username or password." });
     return;
   }
-  const sessionData: SessionData = {
-    user: {
-      id: "beta-luispol",
-      email: null,
-      firstName: "Beta",
-      lastName: "User",
-      profileImageUrl: null,
-    },
-    access_token: "beta",
+
+  const betaUser = {
+    id: "beta-luispol",
+    email: null,
+    firstName: "Beta",
+    lastName: "User",
+    profileImageUrl: null,
   };
-  const sid = await createSession(sessionData);
-  res.json({ token: sid });
+
+  // Beta login always issues a JWT — no database required.
+  // The full OIDC session flow is used in production via /login → /callback.
+  res.json({ token: signBetaToken(betaUser) });
 });
 
 async function upsertUser(claims: Record<string, unknown>) {

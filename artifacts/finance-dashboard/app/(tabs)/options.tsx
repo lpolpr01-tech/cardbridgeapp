@@ -1,20 +1,26 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { SupportSection } from "@/components/SupportSection";
 import { PlaidAddBankButton } from "@/components/PlaidAddBankButton";
+import { apiUrl } from "@/constants/api";
+import { useAuth } from "@/context/AuthContext";
 import {
   Alert,
   Animated,
   Dimensions,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -407,6 +413,11 @@ function ReferFriendModal({ visible, onClose }: { visible: boolean; onClose: () 
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={rf.overlay}>
         <View style={[rf.sheet, { paddingBottom: insets.bottom + 20 }]}>
           <View style={rf.handle} />
@@ -459,6 +470,7 @@ function ReferFriendModal({ visible, onClose }: { visible: boolean; onClose: () 
           )}
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -666,6 +678,11 @@ function PersonalInfoModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={piModal.overlay}>
         <View style={[piModal.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={piModal.handle} />
@@ -675,7 +692,11 @@ function PersonalInfoModal({
               <Feather name="x" size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
             <Text style={piModal.fieldLabel}>First Name</Text>
             <TextInput style={piModal.input} value={firstName} onChangeText={setFirstName} placeholder="First name" placeholderTextColor={Colors.textMuted} autoCapitalize="words" />
             <Text style={piModal.fieldLabel}>Middle Name</Text>
@@ -708,6 +729,7 @@ function PersonalInfoModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -777,6 +799,11 @@ function KycModal({ visible, onClose }: { visible: boolean; onClose: () => void 
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={kyc.overlay}>
         <View style={[kyc.sheet, { paddingBottom: insets.bottom + 8 }]}>
           <View style={kyc.handle} />
@@ -791,7 +818,11 @@ function KycModal({ visible, onClose }: { visible: boolean; onClose: () => void 
               <Feather name="x" size={18} color={Colors.textMuted} />
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
             <Text style={kyc.sectionLabel}>Legal Name</Text>
             <TextInput style={kyc.input} value={legalFirst} onChangeText={setLegalFirst} placeholder="Legal first name" placeholderTextColor={Colors.textMuted} />
             <TextInput style={kyc.input} value={legalMiddle} onChangeText={setLegalMiddle} placeholder="Middle name (optional)" placeholderTextColor={Colors.textMuted} />
@@ -835,6 +866,7 @@ function KycModal({ visible, onClose }: { visible: boolean; onClose: () => void 
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1008,13 +1040,51 @@ function SectionLabel({ text }: { text: string }) {
 
 // ─── Options Screen ───────────────────────────────────────────────────────────
 
+type PlaidDepositoryAccount = {
+  accountId: string;
+  name: string;
+  mask: string | null;
+  subtype: string | null;
+  institutionName: string;
+};
+
 export default function OptionsScreen() {
   const insets = useSafeAreaInsets();
   const { cards, transactions, bankAccounts } = useFinance();
-  const [biometricEnabled, setBiometricEnabled] = React.useState(false);
+  const { token: authToken, isBiometricEnabled, isBiometricAvailable, enableBiometric, disableBiometric, logout } = useAuth();
   const [banksExpanded, setBanksExpanded] = useState(false);
   const [kycVisible, setKycVisible] = useState(false);
   const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
+  const [plaidBanks, setPlaidBanks] = useState<PlaidDepositoryAccount[]>([]);
+
+  // Fetch Plaid-linked depository accounts from backend so the Linked Bank
+  // Accounts list reflects what is actually linked server-side.
+  const fetchPlaidBanks = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl("/api/plaid/accounts"), {
+        method: "GET",
+        headers: { ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        accounts: { accountId: string; name: string; mask: string | null; type: string; subtype: string | null; institutionName: string }[];
+      };
+      const deps = (data.accounts ?? []).filter(
+        (a) => a.type === "depository" || a.subtype === "checking" || a.subtype === "savings",
+      );
+      setPlaidBanks(deps.map((a) => ({
+        accountId: a.accountId,
+        name: a.name,
+        mask: a.mask,
+        subtype: a.subtype,
+        institutionName: a.institutionName,
+      })));
+    } catch {}
+  }, [authToken]);
+
+  useEffect(() => {
+    fetchPlaidBanks();
+  }, [fetchPlaidBanks]);
 
   const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
     firstName: "Luis",
@@ -1099,7 +1169,7 @@ export default function OptionsScreen() {
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
           <SettingRow icon="user" label="Personal Info" subtitle={displayName} onPress={() => setPersonalInfoVisible(true)} />
           <View style={styles.rowDivider} />
-          <SettingRow icon="credit-card" label="Linked Cards" value={`${cards.length} cards`} onPress={() => {}} />
+          <SettingRow icon="credit-card" label="Linked Cards" value={`${cards.length} cards`} onPress={() => router.push("/linked-cards")} />
           <View style={styles.rowDivider} />
           <SettingRow icon="dollar-sign" label="Currency" value="USD" onPress={() => {}} />
         </View>
@@ -1117,12 +1187,12 @@ export default function OptionsScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Bank Accounts</Text>
               <Text style={styles.settingSubtitle}>
-                {bankAccounts.length === 0 ? "No accounts linked" : `${bankAccounts.length} linked`}
+                {(bankAccounts.length + plaidBanks.length) === 0 ? "No accounts linked" : `${bankAccounts.length + plaidBanks.length} linked`}
               </Text>
             </View>
-            {bankAccounts.length > 0 && (
+            {(bankAccounts.length + plaidBanks.length) > 0 && (
               <View style={bankS.countBadge}>
-                <Text style={bankS.countBadgeText}>{bankAccounts.length} linked</Text>
+                <Text style={bankS.countBadgeText}>{bankAccounts.length + plaidBanks.length} linked</Text>
               </View>
             )}
             <Feather
@@ -1135,12 +1205,34 @@ export default function OptionsScreen() {
           {/* Expanded content */}
           {banksExpanded && (
             <>
-              {bankAccounts.length === 0 && (
+              {bankAccounts.length === 0 && plaidBanks.length === 0 && (
                 <View style={bankS.emptyInline}>
                   <Text style={bankS.emptyInlineText}>No bank accounts linked yet. Add one below.</Text>
                 </View>
               )}
-              {bankAccounts.map((bank, idx) => (
+              {plaidBanks.map((bank) => (
+                <React.Fragment key={bank.accountId}>
+                  <View style={styles.rowDivider} />
+                  <View style={styles.settingRow}>
+                    <View style={[styles.settingIcon, { backgroundColor: "rgba(74,222,170,0.08)" }]}>
+                      <Feather name="link" size={16} color={Colors.positive} />
+                    </View>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingLabel}>{bank.institutionName}</Text>
+                      <Text style={styles.settingSubtitle}>
+                        {(bank.subtype ?? "Account").replace(/^./, (c) => c.toUpperCase())}
+                        {bank.mask ? ` ···${bank.mask}` : ""}
+                        {`  ·  ${bank.name}`}
+                      </Text>
+                    </View>
+                    <View style={bankS.connectedBadge}>
+                      <View style={bankS.connectedDot} />
+                      <Text style={bankS.connectedText}>Plaid</Text>
+                    </View>
+                  </View>
+                </React.Fragment>
+              ))}
+              {bankAccounts.map((bank) => (
                 <React.Fragment key={bank.id}>
                   <View style={styles.rowDivider} />
                   <View style={styles.settingRow}>
@@ -1156,7 +1248,7 @@ export default function OptionsScreen() {
                     </View>
                     <View style={bankS.connectedBadge}>
                       <View style={bankS.connectedDot} />
-                      <Text style={bankS.connectedText}>Connected</Text>
+                      <Text style={bankS.connectedText}>Local</Text>
                     </View>
                   </View>
                 </React.Fragment>
@@ -1171,11 +1263,48 @@ export default function OptionsScreen() {
 
         <SectionLabel text="Security" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow icon="shield" label="Biometric Auth" subtitle="Face ID / Fingerprint" toggle toggleValue={biometricEnabled} onToggle={setBiometricEnabled} />
+          <SettingRow
+            icon="shield"
+            label="Biometric Auth"
+            subtitle={
+              isBiometricAvailable
+                ? "Face ID / Touch ID for app unlock"
+                : "Not available on this device"
+            }
+            toggle
+            toggleValue={isBiometricEnabled}
+            onToggle={async (next) => {
+              if (!isBiometricAvailable) {
+                Alert.alert(
+                  "Not available",
+                  "Your device does not have Face ID, Touch ID, or fingerprint enrolled.",
+                );
+                return;
+              }
+              if (next) {
+                const ok = await enableBiometric();
+                if (!ok) {
+                  Alert.alert("Biometric setup failed", "Could not verify your identity. Try again.");
+                }
+              } else {
+                await disableBiometric();
+              }
+            }}
+          />
           <View style={styles.rowDivider} />
-          <SettingRow icon="lock" label="Change PIN" onPress={() => {}} />
+          <SettingRow icon="clock" label="Auto Sign-Out" subtitle="After 15 minutes of inactivity" />
           <View style={styles.rowDivider} />
           <SettingRow icon="eye-off" label="Hide Balance" onPress={() => {}} />
+        </View>
+
+        <SectionLabel text="Support" />
+        <View style={[styles.settingsGroup, GLASS_INLINE]}>
+          <SettingRow
+            icon="alert-triangle"
+            label="Report a Problem"
+            subtitle="Flag a payment issue or get help"
+            onPress={() => router.push("/report-problem")}
+          />
         </View>
 
         <SectionLabel text="Notifications" />
@@ -1194,7 +1323,17 @@ export default function OptionsScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.signOutBtn, pressed && { opacity: 0.75 }]}
-          onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)}
+          onPress={() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            Alert.alert(
+              "Sign Out",
+              "You'll need to sign in again to access your account.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Sign Out", style: "destructive", onPress: () => logout("user") },
+              ],
+            );
+          }}
         >
           <Feather name="log-out" size={16} color={Colors.negative} />
           <Text style={styles.signOutText}>Sign Out</Text>

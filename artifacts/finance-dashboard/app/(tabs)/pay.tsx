@@ -9,18 +9,24 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { apiUrl } from "@/constants/api";
+import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useTheme } from "@/context/ThemeContext";
 import { TransactionItem } from "@/components/TransactionItem";
@@ -707,6 +713,15 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
   const [note, setNote] = useState("");
   const [autoPay, setAutoPay] = useState(false);
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+
+  // When an amount input is focused, scroll the field into view above the keyboard.
+  // The y-coordinate is captured via onLayout on the input wrapper.
+  const inputYs = useRef<Record<string, number>>({});
+  const onInputFocus = (id: string) => {
+    const y = inputYs.current[id] ?? 0;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+  };
 
   const toggleCard = (id: string) => {
     Haptics.selectionAsync();
@@ -738,6 +753,11 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={sch.overlay}>
         <View style={[sch.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={sch.handle} />
@@ -748,7 +768,12 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={scrollRef}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
             <Text style={sch.sectionLabel}>Select Cards</Text>
             {cards.map((card) => {
               const selected = !!selectedCards[card.id];
@@ -780,7 +805,11 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
                   const card = cards.find((c) => c.id === id)!;
                   const color = CARD_COLORS[id] || Colors.primary;
                   return (
-                    <View key={id} style={sch.amountRow}>
+                    <View
+                      key={id}
+                      style={sch.amountRow}
+                      onLayout={(e) => { inputYs.current[id] = e.nativeEvent.layout.y; }}
+                    >
                       <View style={[sch.cardDot, { backgroundColor: color }]} />
                       <Text style={sch.amountCardName}>{card.name}</Text>
                       <View style={sch.amountInputWrap}>
@@ -789,6 +818,7 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
                           style={sch.amountInput}
                           value={amounts[id] || ""}
                           onChangeText={(v) => setAmounts((p) => ({ ...p, [id]: v }))}
+                          onFocus={() => onInputFocus(id)}
                           keyboardType="decimal-pad"
                           placeholder="0.00"
                           placeholderTextColor={Colors.textMuted}
@@ -854,6 +884,7 @@ function ScheduleModal({ visible, onClose }: ScheduleModalProps) {
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -983,6 +1014,11 @@ function CryptoScheduleModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={csch.overlay}>
         <View style={[csch.sheet, { paddingBottom: insets.bottom + 16 }]}>
           <View style={csch.handle} />
@@ -993,7 +1029,11 @@ function CryptoScheduleModal({
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
             {/* ── Multi-token selector ── */}
             <Text style={csch.label}>Select Tokens (pick one or more)</Text>
             <View style={csch.tokenRow}>
@@ -1196,6 +1236,7 @@ function CryptoScheduleModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1296,6 +1337,11 @@ function CryptoModal({
   return (
     <>
       <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+        >
         <View style={cry.overlay}>
           <View style={[cry.sheet, { paddingBottom: insets.bottom + 20 }]}>
             <View style={cry.handle} />
@@ -1332,7 +1378,11 @@ function CryptoModal({
               })}
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            >
               {view === "main" && (
                 <>
                   {/* Balance card */}
@@ -1673,6 +1723,7 @@ function CryptoModal({
             </ScrollView>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <CryptoScheduleModal
@@ -2400,6 +2451,7 @@ const prev = StyleSheet.create({
 
 export default function PayScreen() {
   const { transactions, cards, scheduledPayments, totalBalance } = useFinance();
+  const { token: authToken } = useAuth();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>("All");
   const [scheduleVisible, setScheduleVisible]           = useState(false);
@@ -2478,8 +2530,8 @@ export default function PayScreen() {
     return `CF-${segment(4)}-${segment(4)}-${segment(4)}`;
   };
 
-  const triggerSuccess = (type: PaySuccessType, amount: number) => {
-    const confirmNum = generateConfirmationNumber();
+  const triggerSuccess = (type: PaySuccessType, amount: number, confirmNumOverride?: string) => {
+    const confirmNum = confirmNumOverride ?? generateConfirmationNumber();
     setSuccessType(type);
     setSuccessAmount(amount);
     setSuccessConfirmNum(confirmNum);
@@ -2489,6 +2541,75 @@ export default function PayScreen() {
       setSuccessVisible(true);
     }, 800);
   };
+
+  // Calls POST /api/stripe/pay-all to actually charge the user's linked bank
+  // for all card balances. Requires a Plaid-linked depository account.
+  const confirmPayAllOnServer = useCallback(async () => {
+    // Find the user's first Plaid-linked depository account to use as the funding source
+    let accountId: string | null = null;
+    try {
+      const accountsRes = await fetch(apiUrl("/api/plaid/accounts"), {
+        method: "GET",
+        headers: { ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+      });
+      if (accountsRes.ok) {
+        const data = (await accountsRes.json()) as { accounts: { accountId: string; type: string; subtype: string | null }[] };
+        const depository = data.accounts?.find(
+          (a) => a.type === "depository" || a.subtype === "checking" || a.subtype === "savings",
+        );
+        accountId = depository?.accountId ?? null;
+      }
+    } catch {
+      // Network error — fall through to alert below
+    }
+
+    if (!accountId) {
+      router.push({
+        pathname: "/payment/error",
+        params: {
+          message: "Bank account not found. Link your bank account first via Settings.",
+        },
+      });
+      return;
+    }
+
+    const amounts: Record<string, number> = {};
+    for (const c of cards) amounts[c.id] = c.balance;
+
+    try {
+      const res = await fetch(apiUrl("/api/stripe/pay-all"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          account_id: accountId,
+          amounts,
+          description: `CardBridge Pay All — ${cards.length} cards`,
+        }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        confirmation_number?: string;
+        amount?: number;
+        error?: string;
+        details?: string;
+      };
+      if (!res.ok || !data.success) {
+        const errMsg = data.details ?? data.error ?? "Unknown error";
+        router.push({ pathname: "/payment/error", params: { message: errMsg } });
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      triggerSuccess("ach", data.amount ?? totalBalance, data.confirmation_number);
+    } catch (err) {
+      router.push({
+        pathname: "/payment/error",
+        params: { message: "Network connection lost. Could not reach the payment server." },
+      });
+    }
+  }, [authToken, cards, totalBalance]);
 
   const handlePayAll = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -2800,7 +2921,7 @@ export default function PayScreen() {
       <PayAllPreviewModal
         visible={payAllPreviewVisible}
         onClose={() => setPayAllPreviewVisible(false)}
-        onConfirm={() => triggerSuccess("ach", totalBalance)}
+        onConfirm={confirmPayAllOnServer}
         cards={cards}
         totalAmount={totalBalance}
       />

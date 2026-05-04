@@ -1,12 +1,16 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,6 +43,11 @@ function FeedbackModal({ visible, onClose }: { visible: boolean; onClose: () => 
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <View style={fb.overlay}>
         <View style={[fb.sheet, { paddingBottom: insets.bottom + 20 }]}>
           <View style={fb.handle} />
@@ -63,7 +72,11 @@ function FeedbackModal({ visible, onClose }: { visible: boolean; onClose: () => 
               <Text style={fb.successSub}>Your feedback helps us improve CardFlow.</Text>
             </View>
           ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            >
               <Text style={fb.fieldLabel}>How would you rate your experience?</Text>
               <View style={fb.starsRow}>
                 {[1, 2, 3, 4, 5].map((s) => (
@@ -117,6 +130,7 @@ function FeedbackModal({ visible, onClose }: { visible: boolean; onClose: () => 
           )}
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

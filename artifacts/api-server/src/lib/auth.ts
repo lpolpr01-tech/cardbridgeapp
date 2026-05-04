@@ -1,5 +1,6 @@
 import * as client from "openid-client";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { type Request, type Response } from "express";
 import { db, sessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -83,4 +84,19 @@ export function getSessionId(req: Request): string | undefined {
     return authHeader.slice(7);
   }
   return req.cookies?.[SESSION_COOKIE];
+}
+
+const JWT_SECRET = () => process.env["JWT_SECRET"] ?? "cardbridge-dev-secret-change-in-prod";
+
+export function signBetaToken(user: AuthUser): string {
+  return jwt.sign({ user }, JWT_SECRET(), { expiresIn: "7d" });
+}
+
+export function verifyBetaToken(token: string): AuthUser | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET()) as { user: AuthUser };
+    return payload.user ?? null;
+  } catch {
+    return null;
+  }
 }
