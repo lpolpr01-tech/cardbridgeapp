@@ -2,17 +2,18 @@ import React, { useCallback, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { create, open, dismissLink } from "react-native-plaid-link-sdk";
-import type { LinkSuccess, LinkExit } from "react-native-plaid-link-sdk";
 import Colors from "@/constants/colors";
 import { apiUrl } from "@/constants/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, type PlaidLinkedAccount } from "@/context/FinanceContext";
+import { PlaidLinkModal, type PlaidLinkSuccess } from "./PlaidLinkModal";
 
 export function PlaidAddBankButton({ style }: { style?: any }) {
   const { isAuthenticated, token: authToken } = useAuth();
   const { addPlaidAccounts } = useFinance();
   const [loading, setLoading] = useState(false);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
   const [errorMsg, setErrorMsg] = useState(false);
 
@@ -25,7 +26,6 @@ export function PlaidAddBankButton({ style }: { style?: any }) {
     setLoading(true);
     setErrorMsg(false);
 
-    let linkToken: string;
     try {
       const res = await fetch(apiUrl("/api/plaid/link-token"), {
         method: "POST",
@@ -36,63 +36,56 @@ export function PlaidAddBankButton({ style }: { style?: any }) {
       });
       if (!res.ok) {
         setErrorMsg(true);
-        setLoading(false);
+        setTimeout(() => setErrorMsg(false), 4000);
         return;
       }
       const data = (await res.json()) as { link_token: string };
-      linkToken = data.link_token;
+      setLinkToken(data.link_token);
+      setModalOpen(true);
     } catch {
-      setErrorMsg(true);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // Initialize the SDK with the link token, then open the Plaid Link UI
-      create({ token: linkToken });
-
-      open({
-        onSuccess: async (success: LinkSuccess) => {
-          const publicToken = success.publicToken;
-          const instName =
-            (success.metadata as any)?.institution?.name ?? "Linked Bank";
-          try {
-            const res = await fetch(apiUrl("/api/plaid/exchange"), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-              },
-              body: JSON.stringify({
-                public_token: publicToken,
-                institution_name: instName,
-              }),
-            });
-            if (res.ok) {
-              const data = (await res.json()) as {
-                accounts?: PlaidLinkedAccount[];
-              };
-              if (data.accounts?.length) addPlaidAccounts(data.accounts);
-            }
-          } catch {}
-          setSuccessMsg(true);
-          setTimeout(() => setSuccessMsg(false), 3000);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        },
-        onExit: (_exit: LinkExit) => {
-          setErrorMsg(true);
-          setTimeout(() => setErrorMsg(false), 4000);
-          dismissLink();
-        },
-      });
-    } catch (err) {
-      console.warn("Plaid Link failed:", err);
       setErrorMsg(true);
       setTimeout(() => setErrorMsg(false), 4000);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, authToken, addPlaidAccounts]);
+  }, [isAuthenticated, authToken]);
+
+  const handleSuccess = useCallback(
+    async ({ publicToken, institutionName }: PlaidLinkSuccess) => {
+      try {
+        const res = await fetch(apiUrl("/api/plaid/exchange"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({
+            public_token: publicToken,
+            institution_name: institutionName ?? "Linked Bank",
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { accounts?: PlaidLinkedAccount[] };
+          if (data.accounts?.length) addPlaidAccounts(data.accounts);
+          setSuccessMsg(true);
+          setTimeout(() => setSuccessMsg(false), 3000);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          setErrorMsg(true);
+          setTimeout(() => setErrorMsg(false), 4000);
+        }
+      } catch {
+        setErrorMsg(true);
+        setTimeout(() => setErrorMsg(false), 4000);
+      }
+    },
+    [authToken, addPlaidAccounts],
+  );
+
+  const handleClose = useCallback(() => {
+    setModalOpen(false);
+    setLinkToken(null);
+  }, []);
 
   return (
     <>
@@ -106,7 +99,7 @@ export function PlaidAddBankButton({ style }: { style?: any }) {
         <View style={[s.toast, s.toastError]}>
           <Feather name="x-circle" size={14} color="#FF6B8A" />
           <Text style={[s.toastText, { color: "#FF6B8A" }]}>
-            Bank linking was cancelled. Please try again.
+            Couldn't link bank. Please try again.
           </Text>
         </View>
       )}
@@ -121,6 +114,13 @@ export function PlaidAddBankButton({ style }: { style?: any }) {
           {loading ? "Connecting…" : "＋ Add Another Bank Account"}
         </Text>
       </Pressable>
+
+      <PlaidLinkModal
+        visible={modalOpen}
+        linkToken={linkToken}
+        onSuccess={handleSuccess}
+        onClose={handleClose}
+      />
     </>
   );
 }

@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { SupportSection } from "@/components/SupportSection";
 import { PlaidAddBankButton } from "@/components/PlaidAddBankButton";
 import { apiUrl } from "@/constants/api";
 import { useAuth } from "@/context/AuthContext";
@@ -1053,8 +1052,6 @@ export default function OptionsScreen() {
   const { cards, transactions, bankAccounts } = useFinance();
   const { token: authToken, isBiometricEnabled, isBiometricAvailable, enableBiometric, disableBiometric, logout } = useAuth();
   const [banksExpanded, setBanksExpanded] = useState(false);
-  const [kycVisible, setKycVisible] = useState(false);
-  const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
   const [plaidBanks, setPlaidBanks] = useState<PlaidDepositoryAccount[]>([]);
 
   // Fetch Plaid-linked depository accounts from backend so the Linked Bank
@@ -1086,7 +1083,7 @@ export default function OptionsScreen() {
     fetchPlaidBanks();
   }, [fetchPlaidBanks]);
 
-  const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
+  const [personalInfo] = useState<PersonalInfo>({
     firstName: "Luis",
     middleName: "",
     lastName: "Pol",
@@ -1094,21 +1091,9 @@ export default function OptionsScreen() {
     email: "luispol@gmail.com",
     newsletter: false,
   });
-  const [personalInfoVisible, setPersonalInfoVisible] = useState(false);
-
-  // Profile picture — starts with the CF logo
-  const [profilePhoto, setProfilePhoto] = useState<{ uri: string } | null>(null);
-  const profileSource = profilePhoto ?? CF_LOGO;
-
-  // Profile menu modals
-  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
-  const [referVisible, setReferVisible] = useState(false);
-  const [pickerVisible, setPickerVisible] = useState(false);
 
   const displayName = [personalInfo.firstName, personalInfo.middleName, personalInfo.lastName]
     .filter(Boolean).join(" ");
-  const initials = [personalInfo.firstName[0], personalInfo.lastName[0]]
-    .filter(Boolean).join("").toUpperCase();
 
   const totalCredit = transactions.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
 
@@ -1122,24 +1107,20 @@ export default function OptionsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
       >
-        {/* Profile card — avatar is tappable */}
+        {/* Profile card — tap to open Profile screen */}
         <Pressable
-          onPress={() => { Haptics.selectionAsync(); setProfileMenuVisible(true); }}
+          onPress={() => { Haptics.selectionAsync(); router.push("/profile"); }}
           style={({ pressed }) => [styles.profileCard, GLASS_INLINE, pressed && { opacity: 0.85 }]}
         >
           <View style={styles.avatar}>
-            <Image
-              source={profileSource}
-              style={styles.avatarImg}
-              resizeMode="cover"
-            />
+            <Image source={CF_LOGO} style={styles.avatarImg} resizeMode="cover" />
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileEmail}>{personalInfo.email || "No email set"}</Text>
           </View>
           <View style={styles.profileEditBadge}>
-            <Feather name="edit-2" size={13} color={Colors.primary} />
+            <Feather name="chevron-right" size={14} color={Colors.primary} />
           </View>
           <View style={styles.premiumBadge}>
             <Text style={styles.premiumText}>Premium</Text>
@@ -1167,16 +1148,17 @@ export default function OptionsScreen() {
 
         <SectionLabel text="Account" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow icon="user" label="Personal Info" subtitle={displayName} onPress={() => setPersonalInfoVisible(true)} />
-          <View style={styles.rowDivider} />
-          <SettingRow icon="credit-card" label="Linked Cards" value={`${cards.length} cards`} onPress={() => router.push("/linked-cards")} />
-          <View style={styles.rowDivider} />
-          <SettingRow icon="dollar-sign" label="Currency" value="USD" onPress={() => {}} />
+          <SettingRow
+            icon="lock"
+            label="Change Password"
+            subtitle="Update your sign-in password"
+            onPress={() => router.push("/change-password")}
+          />
         </View>
 
-        <SectionLabel text="Linked Bank Accounts" />
+        <SectionLabel text="Banking" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          {/* Collapsible header row */}
+          {/* Linked Bank Accounts — collapsible */}
           <Pressable
             onPress={() => { Haptics.selectionAsync(); setBanksExpanded((e) => !e); }}
             style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
@@ -1185,7 +1167,7 @@ export default function OptionsScreen() {
               <Text style={{ fontSize: 17 }}>🏦</Text>
             </View>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Bank Accounts</Text>
+              <Text style={styles.settingLabel}>Linked Bank Accounts</Text>
               <Text style={styles.settingSubtitle}>
                 {(bankAccounts.length + plaidBanks.length) === 0 ? "No accounts linked" : `${bankAccounts.length + plaidBanks.length} linked`}
               </Text>
@@ -1195,14 +1177,9 @@ export default function OptionsScreen() {
                 <Text style={bankS.countBadgeText}>{bankAccounts.length + plaidBanks.length} linked</Text>
               </View>
             )}
-            <Feather
-              name={banksExpanded ? "chevron-up" : "chevron-right"}
-              size={16}
-              color={Colors.textMuted}
-            />
+            <Feather name={banksExpanded ? "chevron-up" : "chevron-right"} size={16} color={Colors.textMuted} />
           </Pressable>
 
-          {/* Expanded content */}
           {banksExpanded && (
             <>
               {bankAccounts.length === 0 && plaidBanks.length === 0 && (
@@ -1259,67 +1236,48 @@ export default function OptionsScreen() {
               </View>
             </>
           )}
+
+          <View style={styles.rowDivider} />
+          <SettingRow icon="credit-card" label="Linked Cards" value={`${cards.length} cards`} onPress={() => router.push("/linked-cards")} />
+          <View style={styles.rowDivider} />
+          <SettingRow icon="clock" label="Payment History" subtitle="Scheduled & completed payments" onPress={() => router.push("/payment-history")} />
         </View>
 
         <SectionLabel text="Security" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
           <SettingRow
             icon="shield"
-            label="Biometric Auth"
-            subtitle={
-              isBiometricAvailable
-                ? "Face ID / Touch ID for app unlock"
-                : "Not available on this device"
-            }
+            label="Biometric Authentication"
+            subtitle={isBiometricAvailable ? "Face ID / Touch ID for app unlock" : "Not available on this device"}
             toggle
             toggleValue={isBiometricEnabled}
             onToggle={async (next) => {
               if (!isBiometricAvailable) {
-                Alert.alert(
-                  "Not available",
-                  "Your device does not have Face ID, Touch ID, or fingerprint enrolled.",
-                );
+                Alert.alert("Not available", "Your device does not have Face ID, Touch ID, or fingerprint enrolled.");
                 return;
               }
               if (next) {
                 const ok = await enableBiometric();
-                if (!ok) {
-                  Alert.alert("Biometric setup failed", "Could not verify your identity. Try again.");
-                }
+                if (!ok) Alert.alert("Biometric setup failed", "Could not verify your identity. Try again.");
               } else {
                 await disableBiometric();
               }
             }}
           />
           <View style={styles.rowDivider} />
-          <SettingRow icon="clock" label="Auto Sign-Out" subtitle="After 15 minutes of inactivity" />
-          <View style={styles.rowDivider} />
-          <SettingRow icon="eye-off" label="Hide Balance" onPress={() => {}} />
+          <SettingRow icon="clock" label="Session Timeout" subtitle="Auto sign-out after 15 minutes of inactivity" />
         </View>
 
         <SectionLabel text="Support" />
         <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow
-            icon="alert-triangle"
-            label="Report a Problem"
-            subtitle="Flag a payment issue or get help"
-            onPress={() => router.push("/report-problem")}
-          />
-        </View>
-
-        <SectionLabel text="Notifications" />
-        <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow icon="bell" label="Notification Preferences" subtitle="Manage alerts & delivery methods" onPress={() => setNotifPrefsVisible(true)} />
+          <SettingRow icon="alert-triangle" label="Report a Problem" subtitle="Flag a payment issue or get help" onPress={() => router.push("/report-problem")} />
           <View style={styles.rowDivider} />
-          <SettingRow icon="mail" label="Email Reports" subtitle="Weekly spending summary" onPress={() => {}} />
+          <SettingRow icon="file-text" label="Terms of Service" onPress={() => router.push("/terms")} />
+          <View style={styles.rowDivider} />
+          <SettingRow icon="lock" label="Privacy Policy" onPress={() => router.push("/privacy")} />
+          <View style={styles.rowDivider} />
+          <SettingRow icon="info" label="About CardBridge" onPress={() => router.push("/about")} />
         </View>
-
-        <SectionLabel text="Identity & Compliance" />
-        <View style={[styles.settingsGroup, GLASS_INLINE]}>
-          <SettingRow icon="shield" label="Identity Verification" subtitle="Submit KYC documents" onPress={() => setKycVisible(true)} />
-        </View>
-
-        <SupportSection />
 
         <Pressable
           style={({ pressed }) => [styles.signOutBtn, pressed && { opacity: 0.75 }]}
@@ -1342,28 +1300,6 @@ export default function OptionsScreen() {
         <Text style={styles.version}>CardFlow v1.0.0</Text>
       </ScrollView>
 
-      <PersonalInfoModal
-        visible={personalInfoVisible}
-        info={personalInfo}
-        onSave={setPersonalInfo}
-        onClose={() => setPersonalInfoVisible(false)}
-      />
-      <ProfileMenuModal
-        visible={profileMenuVisible}
-        onClose={() => setProfileMenuVisible(false)}
-        onManageSub={() => { setProfileMenuVisible(false); router.push("/subscription-plan"); }}
-        onRefer={() => { setProfileMenuVisible(false); setReferVisible(true); }}
-        onChangePhoto={() => { setProfileMenuVisible(false); setPickerVisible(true); }}
-      />
-      <ReferFriendModal visible={referVisible} onClose={() => setReferVisible(false)} />
-      <ProfilePictureModal
-        visible={pickerVisible}
-        current={profilePhoto}
-        onAdd={(uri, zoom) => setProfilePhoto({ uri })}
-        onClose={() => setPickerVisible(false)}
-      />
-      <KycModal visible={kycVisible} onClose={() => setKycVisible(false)} />
-      <NotificationsModal visible={notifPrefsVisible} onClose={() => setNotifPrefsVisible(false)} />
     </LinearGradient>
   );
 }

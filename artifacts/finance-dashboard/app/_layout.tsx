@@ -7,7 +7,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
-import { Stack, router, usePathname } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -30,8 +30,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { FinanceProvider } from "@/context/FinanceContext";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { secureGet, SecureKeys } from "@/lib/secure-storage";
-
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
@@ -109,6 +107,14 @@ function RootLayoutNav() {
           animation: "slide_from_right",
         }}
       />
+      <Stack.Screen name="profile" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="kyc-options" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="external-link" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="change-password" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="payment-history" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="about" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="terms" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="privacy" options={{ headerShown: false, animation: "slide_from_right" }} />
     </Stack>
     </KeyboardAvoidingView>
   );
@@ -116,12 +122,19 @@ function RootLayoutNav() {
 
 // TODO: Replace with Replit Auth before going live
 function BetaLoginGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, login, lastLogoutReason } = useAuth();
+  const { isAuthenticated, isLoading, login, signup, lastLogoutReason } = useAuth();
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  // Sign-up extra fields
+  const [fullName, setFullName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [focusedField, setFocusedField] = useState<"username" | "password" | null>(null);
+  const [focusedField, setFocusedField] = useState<
+    "username" | "password" | "fullName" | "dob" | "confirm" | null
+  >(null);
 
   const bgAnim = useRef(new Animated.Value(0)).current;
   const glowScale = useRef(new Animated.Value(1)).current;
@@ -168,6 +181,43 @@ function BetaLoginGate({ children }: { children: React.ReactNode }) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSignup = async () => {
+    if (!fullName.trim() || !dateOfBirth.trim() || !username.trim() || !password) {
+      setError("Please fill in every field.");
+      return;
+    }
+    if (password.length < 4) {
+      setError("Password must be at least 4 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await signup({
+        fullName: fullName.trim(),
+        dateOfBirth: dateOfBirth.trim(),
+        username: username.trim(),
+        password,
+      });
+    } catch (e: unknown) {
+      setError((e as Error).message ?? "Sign up failed. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const switchMode = (next: "login" | "signup") => {
+    setMode(next);
+    setError(null);
+    setSubmitting(false);
+    setPassword("");
+    setConfirmPassword("");
   };
 
   if (isLoading) {
@@ -221,6 +271,47 @@ function BetaLoginGate({ children }: { children: React.ReactNode }) {
 
               <View style={gs.separator} />
 
+              {mode === "signup" && (
+                <>
+                  <View style={gs.fieldGroup}>
+                    <Text style={gs.label}>Full Name</Text>
+                    <View style={[gs.inputWrap, focusedField === "fullName" && gs.inputWrapFocused]}>
+                      <TextInput
+                        style={gs.input}
+                        value={fullName}
+                        onChangeText={(v) => { setFullName(v); setError(null); }}
+                        onFocus={() => setFocusedField("fullName")}
+                        onBlur={() => setFocusedField(null)}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        placeholder="Jane Doe"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        returnKeyType="next"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={gs.fieldGroup}>
+                    <Text style={gs.label}>Date of Birth</Text>
+                    <View style={[gs.inputWrap, focusedField === "dob" && gs.inputWrapFocused]}>
+                      <TextInput
+                        style={gs.input}
+                        value={dateOfBirth}
+                        onChangeText={(v) => { setDateOfBirth(v); setError(null); }}
+                        onFocus={() => setFocusedField("dob")}
+                        onBlur={() => setFocusedField(null)}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        placeholder="MM/DD/YYYY"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        keyboardType="numbers-and-punctuation"
+                        returnKeyType="next"
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+
               <View style={gs.fieldGroup}>
                 <Text style={gs.label}>Username</Text>
                 <View
@@ -237,7 +328,7 @@ function BetaLoginGate({ children }: { children: React.ReactNode }) {
                     onBlur={() => setFocusedField(null)}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder="Enter username"
+                    placeholder={mode === "signup" ? "Pick a username" : "Enter username"}
                     placeholderTextColor="rgba(255,255,255,0.25)"
                     returnKeyType="next"
                   />
@@ -259,13 +350,33 @@ function BetaLoginGate({ children }: { children: React.ReactNode }) {
                     onFocus={() => setFocusedField("password")}
                     onBlur={() => setFocusedField(null)}
                     secureTextEntry
-                    placeholder="Enter password"
+                    placeholder={mode === "signup" ? "Choose a password" : "Enter password"}
                     placeholderTextColor="rgba(255,255,255,0.25)"
-                    returnKeyType="go"
-                    onSubmitEditing={handleLogin}
+                    returnKeyType={mode === "signup" ? "next" : "go"}
+                    onSubmitEditing={mode === "signup" ? undefined : handleLogin}
                   />
                 </View>
               </View>
+
+              {mode === "signup" && (
+                <View style={gs.fieldGroup}>
+                  <Text style={gs.label}>Confirm Password</Text>
+                  <View style={[gs.inputWrap, focusedField === "confirm" && gs.inputWrapFocused]}>
+                    <TextInput
+                      style={gs.input}
+                      value={confirmPassword}
+                      onChangeText={(v) => { setConfirmPassword(v); setError(null); }}
+                      onFocus={() => setFocusedField("confirm")}
+                      onBlur={() => setFocusedField(null)}
+                      secureTextEntry
+                      placeholder="Re-enter password"
+                      placeholderTextColor="rgba(255,255,255,0.25)"
+                      returnKeyType="go"
+                      onSubmitEditing={handleSignup}
+                    />
+                  </View>
+                </View>
+              )}
 
               {error && (
                 <View style={gs.errorBox}>
@@ -274,7 +385,7 @@ function BetaLoginGate({ children }: { children: React.ReactNode }) {
               )}
 
               <Pressable
-                onPress={handleLogin}
+                onPress={mode === "signup" ? handleSignup : handleLogin}
                 disabled={submitting}
                 style={({ pressed }) => [gs.btnWrap, pressed && { opacity: 0.85 }, submitting && { opacity: 0.6 }]}
               >
@@ -287,9 +398,23 @@ function BetaLoginGate({ children }: { children: React.ReactNode }) {
                   {submitting ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text style={gs.btnText}>Sign in</Text>
+                    <Text style={gs.btnText}>{mode === "signup" ? "Create account" : "Sign in"}</Text>
                   )}
                 </LinearGradient>
+              </Pressable>
+
+              <Pressable
+                onPress={() => switchMode(mode === "login" ? "signup" : "login")}
+                style={({ pressed }) => [gs.altBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={gs.altBtnText}>
+                  {mode === "login"
+                    ? "New to CardBridge? "
+                    : "Already have an account? "}
+                  <Text style={gs.altBtnTextStrong}>
+                    {mode === "login" ? "Sign Up" : "Sign In"}
+                  </Text>
+                </Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -350,38 +475,6 @@ function BiometricGate({ children }: { children: React.ReactNode }) {
       </Pressable>
     </View>
   );
-}
-
-// ─── Onboarding gate ─────────────────────────────────────────────────────────
-// First time after sign-in we require: ToS/Privacy acceptance + KYC submission.
-// State is persisted in expo-secure-store so we don't re-ask on subsequent opens.
-function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  const [ready, setReady] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setReady(false);
-      return;
-    }
-    (async () => {
-      const done = await secureGet(SecureKeys.ONBOARDING_COMPLETE);
-      setNeedsOnboarding(done !== "true");
-      setReady(true);
-    })();
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!ready || !isAuthenticated || !needsOnboarding) return;
-    const onOnboarding = pathname?.startsWith("/onboarding");
-    if (!onOnboarding) {
-      router.replace("/onboarding/terms");
-    }
-  }, [ready, isAuthenticated, needsOnboarding, pathname]);
-
-  return <>{children}</>;
 }
 
 // ─── Activity tracker ────────────────────────────────────────────────────────
@@ -631,6 +724,22 @@ const gs = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: 0.3,
   },
+  altBtn: {
+    width: "100%",
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  altBtnText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+  },
+  altBtnTextStrong: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#6C9EFF",
+  },
 });
 
 export default function RootLayout() {
@@ -658,15 +767,13 @@ export default function RootLayout() {
               <AuthProvider>
                 <BetaLoginGate>
                   <BiometricGate>
-                    <OnboardingGate>
-                      <ActivityTracker>
-                        <ThemeProvider>
-                          <FinanceProvider>
-                            <RootLayoutNav />
-                          </FinanceProvider>
-                        </ThemeProvider>
-                      </ActivityTracker>
-                    </OnboardingGate>
+                    <ActivityTracker>
+                      <ThemeProvider>
+                        <FinanceProvider>
+                          <RootLayoutNav />
+                        </FinanceProvider>
+                      </ThemeProvider>
+                    </ActivityTracker>
                   </BiometricGate>
                 </BetaLoginGate>
               </AuthProvider>

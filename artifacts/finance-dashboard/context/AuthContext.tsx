@@ -13,6 +13,13 @@ export type AuthUser = {
   name: string;
 };
 
+export type SignupInput = {
+  fullName: string;
+  dateOfBirth: string;
+  username: string;
+  password: string;
+};
+
 type AuthContextType = {
   token: string | null;
   user: AuthUser | null;
@@ -21,6 +28,7 @@ type AuthContextType = {
   isBiometricEnabled: boolean;
   isBiometricAvailable: boolean;
   login: (username: string, password: string) => Promise<void>;
+  signup: (input: SignupInput) => Promise<void>;
   logout: (reason?: "user" | "inactivity") => Promise<void>;
   bumpActivity: () => void;
   enableBiometric: () => Promise<boolean>;
@@ -109,8 +117,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(data.error ?? "Login failed");
     }
-    const data = (await res.json()) as { token: string };
+    const data = (await res.json()) as {
+      token: string;
+      user?: { username: string; fullName: string; dateOfBirth: string };
+    };
     await secureSet(SecureKeys.AUTH_TOKEN, data.token);
+    if (data.user) {
+      await Promise.all([
+        secureSet(SecureKeys.PROFILE_USERNAME, data.user.username),
+        secureSet(SecureKeys.PROFILE_FULL_NAME, data.user.fullName),
+        secureSet(SecureKeys.PROFILE_DOB, data.user.dateOfBirth),
+      ]);
+    } else {
+      // Beta path — seed Profile screen with sensible defaults
+      await Promise.all([
+        secureSet(SecureKeys.PROFILE_USERNAME, username),
+        secureSet(SecureKeys.PROFILE_FULL_NAME, "Beta User"),
+      ]);
+    }
+    setToken(data.token);
+    setLastLogoutReason(null);
+    lastActivityRef.current = Date.now();
+  }, []);
+
+  const signup = useCallback(async (input: SignupInput) => {
+    const res = await fetch(apiUrl("/api/auth/signup"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? "Sign up failed");
+    }
+    const data = (await res.json()) as {
+      token: string;
+      user: { username: string; fullName: string; dateOfBirth: string };
+    };
+    await secureSet(SecureKeys.AUTH_TOKEN, data.token);
+    await Promise.all([
+      secureSet(SecureKeys.PROFILE_USERNAME, data.user.username),
+      secureSet(SecureKeys.PROFILE_FULL_NAME, data.user.fullName),
+      secureSet(SecureKeys.PROFILE_DOB, data.user.dateOfBirth),
+    ]);
     setToken(data.token);
     setLastLogoutReason(null);
     lastActivityRef.current = Date.now();
@@ -165,6 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isBiometricEnabled,
         isBiometricAvailable,
         login,
+        signup,
         logout,
         bumpActivity,
         enableBiometric,

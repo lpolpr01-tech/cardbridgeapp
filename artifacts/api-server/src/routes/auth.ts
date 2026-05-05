@@ -19,6 +19,24 @@ import {
   ISSUER_URL,
   type SessionData,
 } from "../lib/auth";
+import {
+  registerUser,
+  findUserByUsername,
+  verifyPassword,
+  changePassword as changeUserPassword,
+  type StoredUser,
+} from "../lib/users";
+
+function authUserFromStored(u: StoredUser) {
+  const [firstName, ...rest] = u.fullName.split(" ");
+  return {
+    id: u.id,
+    email: null,
+    firstName: firstName ?? "",
+    lastName: rest.join(" ") || null,
+    profileImageUrl: null,
+  };
+}
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
@@ -65,22 +83,115 @@ const BETA_PASSWORD = "12345";
 
 router.post("/auth/login", async (req: Request, res: Response) => {
   const { username, password } = req.body as { username?: string; password?: string };
-  if (!username || !password || username !== BETA_USERNAME || password !== BETA_PASSWORD) {
+  if (!username || !password) {
     res.status(401).json({ error: "Incorrect username or password." });
     return;
   }
 
-  const betaUser = {
-    id: "beta-luispol",
-    email: null,
-    firstName: "Beta",
-    lastName: "User",
-    profileImageUrl: null,
+  // Hardcoded beta path stays first so existing creds keep working
+  if (username === BETA_USERNAME && password === BETA_PASSWORD) {
+    const betaUser = {
+      id: "beta-luispol",
+      email: null,
+      firstName: "Beta",
+      lastName: "User",
+      profileImageUrl: null,
+    };
+    res.json({ token: signBetaToken(betaUser) });
+    return;
+  }
+
+  const stored = findUserByUsername(username);
+  if (stored && (await verifyPassword(password, stored.passwordHash))) {
+    const authUser = authUserFromStored(stored);
+    res.json({
+      token: signBetaToken(authUser),
+      user: {
+        id: stored.id,
+        username: stored.username,
+        fullName: stored.fullName,
+        dateOfBirth: stored.dateOfBirth,
+      },
+    });
+    return;
+  }
+
+  res.status(401).json({ error: "Incorrect username or password." });
+});
+
+router.post("/auth/signup", async (req: Request, res: Response) => {
+  const { fullName, dateOfBirth, username, password } = req.body as {
+    fullName?: string;
+    dateOfBirth?: string;
+    username?: string;
+    password?: string;
   };
 
-  // Beta login always issues a JWT — no database required.
-  // The full OIDC session flow is used in production via /login → /callback.
-  res.json({ token: signBetaToken(betaUser) });
+  if (!fullName?.trim() || !dateOfBirth?.trim() || !username?.trim() || !password) {
+    res.status(400).json({ error: "All fields are required." });
+    return;
+  }
+  if (password.length < 4) {
+    res.status(400).json({ error: "Password must be at least 4 characters." });
+    return;
+  }
+  if (username.trim().toLowerCase() === BETA_USERNAME) {
+    res.status(409).json({ error: "Username already taken." });
+    return;
+  }
+
+  try {
+    const stored = await registerUser({ fullName, dateOfBirth, username, password });
+    const authUser = authUserFromStored(stored);
+    res.json({
+      token: signBetaToken(authUser),
+      user: {
+        id: stored.id,
+        username: stored.username,
+        fullName: stored.fullName,
+        dateOfBirth: stored.dateOfBirth,
+      },
+    });
+  } catch (err) {
+    res.status(409).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/auth/change-password", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "Current and new password are required." });
+    return;
+  }
+  if (newPassword.length < 4) {
+    res.status(400).json({ error: "New password must be at least 4 characters." });
+    return;
+  }
+
+  if (req.user!.id === "beta-luispol") {
+    res.status(403).json({
+      error: "Beta credentials are fixed. Sign up for a regular account to change your password.",
+    });
+    return;
+  }
+
+  const result = await changeUserPassword(req.user!.id, currentPassword, newPassword);
+  if (!result.ok) {
+    if (result.reason === "wrong_password") {
+      res.status(401).json({ error: "Current password is incorrect." });
+    } else {
+      res.status(404).json({ error: "User not found." });
+    }
+    return;
+  }
+  res.json({ ok: true });
 });
 
 async function upsertUser(claims: Record<string, unknown>) {

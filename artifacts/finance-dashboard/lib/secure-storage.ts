@@ -15,9 +15,13 @@ export const SecureKeys = {
   KYC_COMPLETED_AT: "cardbridge.kyc_completed_at",
   BIOMETRIC_ENABLED: "cardbridge.biometric_enabled",
   KYC_DATA: "cardbridge.kyc_data",
+  PROFILE_FULL_NAME: "cardbridge.profile_full_name",
+  PROFILE_DOB: "cardbridge.profile_dob",
+  PROFILE_USERNAME: "cardbridge.profile_username",
+  KYC_STATUS: "cardbridge.kyc_status",
 } as const;
 
-export type SecureKey = (typeof SecureKeys)[keyof typeof SecureKeys];
+export type SecureKey = (typeof SecureKeys)[keyof typeof SecureKeys] | string;
 
 export async function secureGet(key: SecureKey): Promise<string | null> {
   try {

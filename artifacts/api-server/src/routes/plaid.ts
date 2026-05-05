@@ -11,6 +11,69 @@ import {
 
 const router = Router();
 
+// GET /api/plaid/link?token=...
+// Hosted Plaid Link page for the iPhone WebView fallback (Expo Go can't load
+// the native Plaid SDK). The link_token is the auth — it's user-scoped and
+// short-lived, so no JWT bearer is required to render this page.
+router.get("/plaid/link", (req, res) => {
+  const token = String(req.query["token"] ?? "");
+  if (!token) {
+    res.status(400).type("text/plain").send("Missing token");
+    return;
+  }
+  const tokenJson = JSON.stringify(token);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Link account</title>
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<style>
+html,body{margin:0;padding:0;height:100%;background:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.center{display:flex;align-items:center;justify-content:center;height:100%;color:#555;text-align:center;padding:0 24px}
+</style>
+</head>
+<body>
+<div class="center" id="status">Opening Plaid…</div>
+<script>
+(function () {
+  var post = function (msg) {
+    try { window.ReactNativeWebView.postMessage(JSON.stringify(msg)); } catch (e) {}
+  };
+  if (typeof Plaid === "undefined") {
+    document.getElementById("status").innerText = "Couldn't reach Plaid. Check your connection and try again.";
+    post({ type: "error", message: "Plaid script failed to load" });
+    return;
+  }
+  try {
+    var handler = Plaid.create({
+      token: ${tokenJson},
+      onSuccess: function (public_token, metadata) {
+        post({ type: "success", public_token: public_token, metadata: metadata });
+      },
+      onExit: function (err, metadata) {
+        post({ type: "exit", err: err, metadata: metadata });
+      },
+      onEvent: function (eventName, metadata) {
+        post({ type: "event", eventName: eventName, metadata: metadata });
+      },
+      onLoad: function () {
+        post({ type: "loaded" });
+      }
+    });
+    handler.open();
+  } catch (e) {
+    post({ type: "error", message: String((e && e.message) || e) });
+  }
+})();
+</script>
+</body>
+</html>`);
+});
+
 // POST /api/plaid/link-token
 // Creates a Plaid Link token to start the bank linking flow in the app
 router.post("/plaid/link-token", requireAuth, async (req, res) => {
@@ -230,6 +293,7 @@ router.post("/plaid/transactions", requireAuth, async (req, res) => {
     accountId: string;
     title: string;
     category: string;
+    categoryDetailed: string | null;
     amount: number;
     date: string;
     type: "debit" | "credit";
@@ -251,6 +315,7 @@ router.post("/plaid/transactions", requireAuth, async (req, res) => {
           accountId: t.account_id,
           title: t.merchant_name ?? t.name ?? "Transaction",
           category: t.personal_finance_category?.primary ?? t.category?.[0] ?? "Other",
+          categoryDetailed: t.personal_finance_category?.detailed ?? null,
           // Plaid amounts are positive for outflows, negative for inflows
           amount: -t.amount,
           date: t.date,
